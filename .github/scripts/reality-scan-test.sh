@@ -9,6 +9,10 @@ source "${ROOT}/lib/reality-scan.sh"
 test_blocked() {
     kokoro_reality_blocked "www.apple.com" && echo "block apple OK"
     kokoro_reality_blocked "gateway.icloud.com" && echo "block icloud OK"
+    kokoro_reality_blocked "WWW.MICROSOFT.COM" && echo "block microsoft OK"
+    kokoro_reality_blocked "example.cn" && echo "block cn OK"
+    kokoro_reality_blocked "example.ru" && echo "block ru OK"
+    kokoro_reality_blocked "example.ir" && echo "block ir OK"
     ! kokoro_reality_blocked "www.sky.com" && echo "allow sky OK"
 }
 

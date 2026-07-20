@@ -8,7 +8,12 @@ KOKORO_REALITY_SCAN_TIMEOUT="${KOKORO_REALITY_SCAN_TIMEOUT:-8}"
 
 kokoro_reality_blocked() {
     local host="${1,,}"
-    [[ "$host" == *apple* || "$host" == *icloud* ]]
+    [[ "$host" == *apple* ||
+        "$host" == *icloud* ||
+        "$host" == *microsoft* ||
+        "$host" == *.cn ||
+        "$host" == *.ru ||
+        "$host" == *.ir ]]
 }
 
 kokoro_reality_normalize_host() {
@@ -73,12 +78,7 @@ kokoro_reality_validate_one() {
     fi
 
     if kokoro_reality_blocked "$host"; then
-        echo -e "FAIL\t0\t0\tapple-or-icloud-blocked\t${host}"
-        return
-    fi
-
-    if [[ "$host" == *.cn || "$host" == *".gov.cn" ]]; then
-        echo -e "FAIL\t0\t0\tchina-tld\t${host}"
+        echo -e "FAIL\t0\t0\tupstream-risk-blocked\t${host}"
         return
     fi
 
@@ -250,7 +250,7 @@ kokoro-xray reality scan — validate REALITY targets
 
 Checks each hostname (no bulk third-party import):
   DNS resolve, TLS 1.3, ALPN h2, cert SAN, redirect rules.
-Rejects apple/icloud and .cn TLDs (per Xray-core guidance).
+Rejects Apple/iCloud/Microsoft names and .cn/.ru/.ir TLDs per Xray-core.
 
 Usage:
   kokoro-xray reality scan

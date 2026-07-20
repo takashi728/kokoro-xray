@@ -36,7 +36,8 @@ Caddy overwrites `Kokoro-Trusted-XFF` on TLS proxy requests. Xray trusts
 
 `kokoro-xray reality scan` probes `data/reality-seeds.txt` plus optional `--domains` / `--file`.
 Each host is validated (not bulk-imported): TLS 1.3, ALPN h2, cert SAN, redirect rules.
-Rejects `apple`/`icloud` per Xray-core. Scores by latency + OCSP bonus.
+Rejects Apple/iCloud/Microsoft names and `.cn`/`.ru`/`.ir` TLDs per Xray-core.
+Scores by latency + OCSP bonus.
 
 ## Multi-node pairing
 

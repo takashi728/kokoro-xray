@@ -1,4 +1,4 @@
-# Curated REALITY probe seeds (no Apple/iCloud).
+# Curated REALITY probe seeds (excluding upstream-risky names and TLDs).
 # The scanner validates TLS 1.3 + ALPN h2 + cert SAN + redirect rules.
 # One hostname per line; lines starting with # are ignored.
 
@@ -9,7 +9,6 @@ dl.google.com
 www.debian.org
 ubuntu.com
 github.com
-www.microsoft.com
 stackoverflow.com
 www.wikipedia.org
 discord.com
