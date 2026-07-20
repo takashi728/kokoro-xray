@@ -18,6 +18,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 - `443/tcp` open on edge nodes
 - `80/tcp` open on TLS edge nodes for ACME
 - Exit node UDP port open when using edge + exit, default `51820/udp`
+- Xray-core `v26.3.27` or newer on REALITY clients
 
 ## Install
 
@@ -138,6 +139,7 @@ The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect b
 ## Notes
 
 - Xray downloads are verified with upstream SHA256 digest files.
+- Xray-core is pinned to the latest tested stable release.
 - Caddy builds are pinned and rebuilt only when needed.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
 - UFW defaults to deny incoming and allow outgoing when firewall support is enabled.

@@ -4,8 +4,6 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 source "${KOKORO_ROOT}/lib/geodata.sh"
 
-KOKORO_XRAY_VERSION="${KOKORO_XRAY_VERSION:-v26.6.1}"
-
 kokoro_xray_load_paths() {
     dest="$(kokoro_cfg '.paths.xray_bin')"
     geo_dir="$(kokoro_cfg '.paths.geo_dir')"
