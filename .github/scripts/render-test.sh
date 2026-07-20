@@ -45,6 +45,8 @@ jq -n -r -f "${ROOT}/lib/caddy.jq" \
 grep -q 'layer4' "${OUT}/Caddyfile"
 grep -q 'listener_wrappers' "${OUT}/Caddyfile"
 grep -q 'proxy tcp/127.0.0.1:8443' "${OUT}/Caddyfile"
+grep -q 'header_up Kokoro-Trusted-XFF 1' "${OUT}/Caddyfile"
+jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.sockopt.trustedXForwardedFor == ["Kokoro-Trusted-XFF"]' "${OUT}/edge-xray.json" >/dev/null
 
 echo "== exit xray =="
 jq -n -f "${ROOT}/lib/render.jq" \

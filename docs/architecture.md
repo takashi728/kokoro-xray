@@ -29,6 +29,9 @@ preflight.sh → render.jq + caddy.jq → validate.sh → firewall.sh → reload
 | `tls` | — | Caddy L7 | Caddy |
 | `both` | Xray `127.0.0.1:8443` | Caddy L4 SNI split | Caddy (xcaddy + caddy-l4) |
 
+Caddy overwrites `Kokoro-Trusted-XFF` on TLS proxy requests. Xray trusts
+`X-Forwarded-For` only when that marker arrives over its loopback listener.
+
 ## REALITY scan
 
 `kokoro-xray reality scan` probes `data/reality-seeds.txt` plus optional `--domains` / `--file`.

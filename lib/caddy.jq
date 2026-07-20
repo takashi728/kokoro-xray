@@ -31,6 +31,7 @@ else "" end;
 \(cdn) {
     handle \(path)* {
         reverse_proxy 127.0.0.1:8444 {
+            header_up Kokoro-Trusted-XFF 1
             transport http {
                 versions h2c
             }
