@@ -34,6 +34,15 @@ test_parse_allow() {
     echo "parse_allow OK"
 }
 
+test_ipv4() {
+    kokoro_firewall_valid_ipv4 '203.0.113.10'
+    ! kokoro_firewall_valid_ipv4 '203.0.113.999'
+    ! kokoro_firewall_valid_ipv4 '203.0.113.010'
+    ! kokoro_firewall_valid_ipv4 'edge.example.com'
+    echo "ipv4_validate OK"
+}
+
 test_ssh_detect
 test_parse_allow
+test_ipv4
 echo "firewall-test OK"

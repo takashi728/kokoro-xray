@@ -11,6 +11,17 @@ kokoro_firewall_valid_port() {
     [[ "$p" =~ ^[0-9]+$ ]] && [[ "$p" -ge 1 && "$p" -le 65535 ]]
 }
 
+kokoro_firewall_valid_ipv4() {
+    local ip="$1" part
+    local -a parts
+    IFS='.' read -r -a parts <<<"$ip"
+    [[ "${#parts[@]}" -eq 4 ]] || return 1
+    for part in "${parts[@]}"; do
+        [[ "$part" =~ ^(0|[1-9][0-9]{0,2})$ ]] || return 1
+        [[ "$part" -le 255 ]] || return 1
+    done
+}
+
 kokoro_firewall_detect_ssh() {
     local port=22 line p
     if [[ -f "${KOKORO_SSHD_CONFIG}" ]]; then
@@ -97,6 +108,12 @@ kokoro_firewall_ufw_allow() {
     ufw allow "$spec" comment "$comment" >/dev/null 2>&1 || true
 }
 
+kokoro_firewall_ufw_allow_from() {
+    local source="$1" port="$2" proto="$3" comment="$4"
+    ufw allow from "$source" to any port "$port" proto "$proto" comment "$comment" >/dev/null 2>&1 \
+        || kokoro_die "failed to restrict ${port}/${proto} to ${source}"
+}
+
 kokoro_firewall_warn_only() {
     local role mode port
     role="$(kokoro_cfg '.role')"
@@ -110,16 +127,16 @@ kokoro_firewall_warn_only() {
             fi
             ;;
         exit)
-            kokoro_warn "firewall disabled — ensure: ${port}/udp"
+            kokoro_warn "firewall disabled - allow ${port}/tcp from the edge IPv4 only"
             ;;
     esac
 }
 
 kokoro_firewall_service_rules() {
-    local role mode wg_port
+    local role mode exit_port edge_ip
     role="$(kokoro_cfg '.role')"
     mode="$(kokoro_cfg '.inbound.mode')"
-    wg_port="$(kokoro_cfg '.multinode.exit_port')"
+    exit_port="$(kokoro_cfg '.multinode.exit_port')"
 
     case "$role" in
         edge)
@@ -129,7 +146,8 @@ kokoro_firewall_service_rules() {
             fi
             ;;
         exit)
-            kokoro_firewall_ufw_allow "${wg_port}/udp" "kokoro-wg"
+            edge_ip="$(kokoro_cfg '.multinode.edge_ip')"
+            kokoro_firewall_ufw_allow_from "$edge_ip" "$exit_port" tcp "kokoro-vless-pqc"
             ;;
     esac
 }

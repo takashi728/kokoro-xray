@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# kokoro-xray — exchange WG peer keys between edge and exit
+# kokoro-xray - exchange high-assurance relay information
 
 export KOKORO_ROOT="$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)"
 source "${KOKORO_ROOT}/lib/common.sh"
 source "${KOKORO_ROOT}/lib/apply.sh"
+source "${KOKORO_ROOT}/lib/relay.sh"
 
 kokoro_pair() {
     local role
@@ -12,26 +13,23 @@ kokoro_pair() {
 
     case "$role" in
         edge)
-            local ip pub
-            read -r -p "Exit node IP: " ip
-            read -r -p "Exit WG public key: " pub
-            kokoro_cfg_set_str '.multinode.exit_ip' "$ip"
-            kokoro_cfg_set_str '.multinode.peer_exit_pubkey' "$pub"
-            kokoro_cfg_set '.multinode.enabled' 'true'
+            local bundle
+            read -r -s -p "Paste exit relay bundle: " bundle
+            echo
+            kokoro_relay_import_bundle "$bundle"
             kokoro_apply
             echo ""
             echo "=== Give this to exit node ==="
-            echo "edge_wg_pubkey=$(kokoro_sec '.multinode.edge_wg_pubkey')"
+            echo "edge_ip=$(kokoro_relay_public_ipv4)"
             ;;
         exit)
-            local epub
-            read -r -p "Edge WG public key: " epub
-            kokoro_cfg_set_str '.multinode.peer_edge_pubkey' "$epub"
+            local edge_ip
+            read -r -p "Edge public IPv4: " edge_ip
+            kokoro_cfg_set_str '.multinode.edge_ip' "$edge_ip"
             kokoro_apply
             echo ""
             echo "=== Give this to edge node ==="
-            echo "exit_wg_pubkey=$(kokoro_sec '.multinode.exit_wg_pubkey')"
-            echo "exit_ip=$(curl -4 -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+            kokoro_relay_export_bundle
             ;;
         *)
             kokoro_die "set role first (run edge or exit install)"

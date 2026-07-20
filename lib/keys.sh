@@ -71,20 +71,25 @@ kokoro_ensure_vless_encryption_keys() {
     fi
 }
 
-kokoro_gen_edge_wg_keys() {
-    local priv pub
-    priv="$(wg genkey)"
-    pub="$(printf '%s' "$priv" | wg pubkey)"
-    kokoro_sec_set_str '.multinode.edge_wg_privkey' "$priv"
-    kokoro_sec_set_str '.multinode.edge_wg_pubkey' "$pub"
-}
+kokoro_gen_exit_vless_secrets() {
+    local xray_bin out uuid decryption encryption
+    xray_bin="$(kokoro_cfg '.paths.xray_bin')"
+    [[ -x "$xray_bin" ]] || kokoro_die "xray not installed"
 
-kokoro_gen_exit_wg_keys() {
-    local priv pub
-    priv="$(wg genkey)"
-    pub="$(printf '%s' "$priv" | wg pubkey)"
-    kokoro_sec_set_str '.multinode.exit_wg_privkey' "$priv"
-    kokoro_sec_set_str '.multinode.exit_wg_pubkey' "$pub"
+    uuid="$("$xray_bin" uuid)"
+    out="$("$xray_bin" vlessenc)"
+    decryption="$(printf '%s\n' "$out" | awk -F'"' '$2 == "decryption" {n++; if (n == 2) {print $4; exit}}')"
+    encryption="$(printf '%s\n' "$out" | awk -F'"' '$2 == "encryption" {n++; if (n == 2) {print $4; exit}}')"
+
+    if [[ ! "$decryption" =~ ^mlkem768x25519plus\.native\.600s\.[A-Za-z0-9_-]{86}$ ||
+        ! "$encryption" =~ ^mlkem768x25519plus\.native\.0rtt\.[A-Za-z0-9_-]{1579}$ ]]; then
+        printf '%s\n' "$out" >&2
+        kokoro_die "failed to parse post-quantum VLESS Encryption output"
+    fi
+
+    kokoro_sec_set_str '.multinode.exit_vless_uuid' "$uuid"
+    kokoro_sec_set_str '.multinode.exit_vless_decryption' "$decryption"
+    kokoro_sec_set_str '.multinode.exit_vless_encryption' "$encryption"
 }
 
 kokoro_secrets_exist() {
@@ -95,7 +100,9 @@ kokoro_secrets_exist() {
             [[ -n "$(kokoro_sec '.inbound.uuid')" && -n "$(kokoro_sec '.inbound.reality.private_key')" ]]
             ;;
         exit)
-            [[ -n "$(kokoro_sec '.multinode.exit_wg_privkey')" ]]
+            [[ -n "$(kokoro_sec '.multinode.exit_vless_uuid // empty')" &&
+                -n "$(kokoro_sec '.multinode.exit_vless_decryption // empty')" &&
+                -n "$(kokoro_sec '.multinode.exit_vless_encryption // empty')" ]]
             ;;
         *)
             false
@@ -113,11 +120,10 @@ kokoro_gen_edge_secrets() {
     kokoro_sec_set '.inbound.reality.short_ids' "[\"${sid}\"]"
     kokoro_gen_reality_keys
     kokoro_ensure_vless_encryption_keys
-    kokoro_gen_edge_wg_keys
 }
 
 kokoro_gen_exit_secrets() {
-    kokoro_gen_exit_wg_keys
+    kokoro_gen_exit_vless_secrets
 }
 
 kokoro_gen_secrets() {

@@ -23,13 +23,10 @@
   },
   "multinode": {
     "enabled": true,
+    "transport": "vless-pqc",
     "exit_ip": "203.0.113.2",
     "exit_port": 51820,
-    "peer_exit_pubkey": "yAnzG8wXnOp5lN8vK2mR3sT4uV5wX6yZ7aB8cD9eF0=",
-    "peer_edge_pubkey": "",
-    "local_wg_ip": "10.66.0.2",
-    "peer_wg_ip": "10.66.0.1",
-    "finalmask": true
+    "edge_ip": ""
   },
   "tor": {
     "enabled": false,

@@ -39,5 +39,5 @@ kokoro_pkg_install() {
 
 kokoro_install_deps() {
     kokoro_os_supported || kokoro_die "only Debian/Ubuntu supported for now"
-    kokoro_pkg_install curl jq ca-certificates unzip wireguard-tools ufw
+    kokoro_pkg_install curl jq ca-certificates unzip ufw
 }

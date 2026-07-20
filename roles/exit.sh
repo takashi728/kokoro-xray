@@ -16,6 +16,7 @@ source "${KOKORO_ROOT}/lib/common.sh"
 source "${KOKORO_ROOT}/lib/os.sh"
 source "${KOKORO_ROOT}/lib/xray.sh"
 source "${KOKORO_ROOT}/lib/keys.sh"
+source "${KOKORO_ROOT}/lib/relay.sh"
 source "${KOKORO_ROOT}/lib/onboard.sh"
 source "${KOKORO_ROOT}/lib/apply.sh"
 source "${KOKORO_ROOT}/lib/network-tune.sh"
@@ -41,25 +42,27 @@ kokoro_exit_install() {
         fi
     fi
 
-    if [[ -z "$(kokoro_cfg '.multinode.peer_edge_pubkey')" || "$(kokoro_cfg '.multinode.peer_edge_pubkey')" == "null" ]]; then
+    if [[ -z "$(kokoro_cfg '.multinode.edge_ip')" || "$(kokoro_cfg '.multinode.edge_ip')" == "null" ]]; then
         if [[ -t 0 ]]; then
-            local epub
-            read -r -p "Edge WG public key (leave empty to pair later): " epub
-            [[ -n "$epub" ]] && kokoro_cfg_set_str '.multinode.peer_edge_pubkey' "$epub"
+            local edge_ip
+            read -r -p "Edge public IPv4 (leave empty to pair later): " edge_ip
+            [[ -n "$edge_ip" ]] && kokoro_cfg_set_str '.multinode.edge_ip' "$edge_ip"
         else
-            kokoro_warn "multinode.peer_edge_pubkey not set — run: kokoro-xray pair"
+            kokoro_warn "multinode.edge_ip not set - run: kokoro-xray pair"
         fi
     fi
 
-    if [[ -z "$(kokoro_cfg '.multinode.peer_edge_pubkey')" || "$(kokoro_cfg '.multinode.peer_edge_pubkey')" == "null" ]]; then
-        kokoro_warn "exit configured but not applied — missing edge WG public key"
-        kokoro_warn "install edge, run kokoro-xray pair, then run kokoro-xray apply on exit"
+    if [[ -z "$(kokoro_cfg '.multinode.edge_ip')" || "$(kokoro_cfg '.multinode.edge_ip')" == "null" ]]; then
+        kokoro_warn "exit configured but not applied - missing edge public IPv4"
+        kokoro_warn "install edge, run kokoro-xray pair, then apply on exit"
     else
         kokoro_apply
     fi
     kokoro_network_tune || true
-    kokoro_log "exit pubkey (paste on edge): $(kokoro_sec '.multinode.exit_wg_pubkey')"
-    kokoro_log "open UDP $(kokoro_cfg '.multinode.exit_port') on firewall"
+    echo ""
+    echo "=== Exit relay bundle (paste on edge) ==="
+    kokoro_relay_export_bundle
+    kokoro_log "allow TCP $(kokoro_cfg '.multinode.exit_port') from the edge IPv4 only"
 }
 
 kokoro_exit_install

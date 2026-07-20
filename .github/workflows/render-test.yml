@@ -23,6 +23,8 @@ jobs:
         run: bash .github/scripts/link-test.sh
       - name: Run VLESS Encryption tests
         run: bash .github/scripts/vless-encryption-test.sh
+      - name: Run PQ exit relay tests
+        run: bash .github/scripts/pq-relay-test.sh
       - name: Run firewall tests
         run: bash .github/scripts/firewall-test.sh
       - name: Run source path tests

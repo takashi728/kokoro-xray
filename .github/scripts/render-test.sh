@@ -13,8 +13,11 @@ jq -n -f "${ROOT}/lib/render.jq" \
     >"${OUT}/edge-xray.json"
 jq -e '.inbounds | length == 2' "${OUT}/edge-xray.json" >/dev/null
 jq -e '(.outbounds | map(.tag) | index("TOR")) | not' "${OUT}/edge-xray.json" >/dev/null
-jq -e '.outbounds | map(.tag) | index("WG_TO_EXIT")' "${OUT}/edge-xray.json" >/dev/null
-jq -e '.routing.rules[-1].outboundTag == "WG_TO_EXIT"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.outbounds | map(.tag) | index("VLESS_PQC_TO_EXIT")' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="VLESS_PQC_TO_EXIT") | .protocol == "vless"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="VLESS_PQC_TO_EXIT") | .settings.vnext[0].users[0].flow == "xtls-rprx-vision-udp443"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="VLESS_PQC_TO_EXIT") | .streamSettings.network == "raw"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.routing.rules[-1].outboundTag == "VLESS_PQC_TO_EXIT"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .listen == "127.0.0.1"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/edge-xray.json" >/dev/null
@@ -30,7 +33,7 @@ jq -n -f "${ROOT}/lib/render.jq" \
     --slurpfile cfg "${FIX}/edge-single-config.json" \
     --slurpfile sec "${FIX}/edge-secrets.json" \
     >"${OUT}/edge-single-xray.json"
-jq -e '(.outbounds | map(.tag) | index("WG_TO_EXIT")) | not' "${OUT}/edge-single-xray.json" >/dev/null
+jq -e '(.outbounds | map(.tag) | index("VLESS_PQC_TO_EXIT")) | not' "${OUT}/edge-single-xray.json" >/dev/null
 jq -e '.routing.rules[0].domain[0] == "geosite:google"' "${OUT}/edge-single-xray.json" >/dev/null
 jq -e '.routing.rules[0].domain | index("domain:googleapis.cn")' "${OUT}/edge-single-xray.json" >/dev/null
 jq -e '.routing.rules[0].domain | index("domain:gstatic.cn")' "${OUT}/edge-single-xray.json" >/dev/null
@@ -63,7 +66,10 @@ jq -n -f "${ROOT}/lib/render.jq" \
     --slurpfile cfg "${FIX}/exit-config.json" \
     --slurpfile sec "${FIX}/exit-secrets.json" \
     >"${OUT}/exit-xray.json"
-jq -e '.inbounds[0].protocol == "wireguard"' "${OUT}/exit-xray.json" >/dev/null
+jq -e '.inbounds[0].protocol == "vless"' "${OUT}/exit-xray.json" >/dev/null
+jq -e '.inbounds[0].tag == "VLESS_PQC_EXIT_IN"' "${OUT}/exit-xray.json" >/dev/null
+jq -e '.inbounds[0].settings.users[0].flow == "xtls-rprx-vision"' "${OUT}/exit-xray.json" >/dev/null
+jq -e '.inbounds[0].settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.outbounds | map(.tag) | index("TOR")' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[0].outboundTag == "TOR"' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "DIRECT"' "${OUT}/exit-xray.json" >/dev/null

@@ -20,6 +20,7 @@ source "${KOKORO_ROOT}/lib/os.sh"
 source "${KOKORO_ROOT}/lib/xray.sh"
 source "${KOKORO_ROOT}/lib/caddy.sh"
 source "${KOKORO_ROOT}/lib/keys.sh"
+source "${KOKORO_ROOT}/lib/relay.sh"
 source "${KOKORO_ROOT}/lib/onboard.sh"
 source "${KOKORO_ROOT}/lib/cf.sh"
 source "${KOKORO_ROOT}/lib/apply.sh"
@@ -58,21 +59,19 @@ kokoro_edge_install() {
     fi
 
     if [[ -t 0 && "$(kokoro_cfg '.multinode.enabled')" != "true" ]]; then
-        read -r -p "Enable multinode WG to exit? [y/N] " mn
+        read -r -p "Enable high-assurance PQ relay to exit? [y/N] " mn
         if [[ "$mn" =~ ^[Yy]$ ]]; then
-            local ip pub
-            read -r -p "Exit node IP: " ip
-            read -r -p "Exit WG public key: " pub
-            kokoro_cfg_set_str '.multinode.exit_ip' "$ip"
-            kokoro_cfg_set_str '.multinode.peer_exit_pubkey' "$pub"
-            kokoro_cfg_set '.multinode.enabled' 'true'
+            local bundle
+            read -r -s -p "Paste exit relay bundle: " bundle
+            echo
+            kokoro_relay_import_bundle "$bundle"
         fi
     fi
 
     kokoro_apply
     kokoro_network_tune || true
     if [[ "$(kokoro_cfg '.multinode.enabled')" == "true" ]]; then
-        kokoro_log "edge pubkey (paste on exit): $(kokoro_sec '.multinode.edge_wg_pubkey')"
+        kokoro_log "edge public IPv4 (set on exit): $(kokoro_relay_public_ipv4)"
     fi
 }
 

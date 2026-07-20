@@ -12,7 +12,7 @@
 | File | Mode | Contents |
 |------|------|----------|
 | `~/.kokoro-xray/config.json` | 644 | role, mode, domains, routing preset |
-| `~/.kokoro-xray/secrets.json` | 600 | uuid, keys, wg private keys |
+| `~/.kokoro-xray/secrets.json` | 600 | UUIDs and transport encryption keys |
 | `~/.kokoro-xray/last-good/` | 700 | rollback snapshots |
 
 ## Apply pipeline
@@ -48,6 +48,23 @@ Scores by latency + OCSP bonus.
 
 ## Multi-node pairing
 
-1. Install **exit** → copy `exit_wg_pubkey`
-2. Install **edge** with exit IP + pubkey, or run `kokoro-xray pair`
-3. Paste `edge_wg_pubkey` back on exit → `kokoro-xray apply`
+1. Install **exit** and copy its one-line relay bundle
+2. Import that bundle on **edge** with `kokoro-xray pair`
+3. Set the edge public IPv4 on **exit** with `kokoro-xray pair`
+4. Apply the exit; UFW allows its relay port from that IPv4 only
+
+The exit generates a dedicated UUID and the ML-KEM-768 authentication variant
+from `xray vlessenc`. The edge holds the UUID and client encryption string.
+The exit holds the UUID, client string, and server decryption string.
+
+```
+edge inbound
+  -> VLESS_PQC_TO_EXIT (RAW, Vision/XUDP, ML-KEM-768 + X25519)
+  -> VLESS_PQC_EXIT_IN
+  -> exit routing
+  -> Internet or Tor
+```
+
+The first connection performs the hybrid post-quantum handshake; tickets allow
+subsequent 0-RTT connections. This branch intentionally avoids WireGuard and
+additional VPN daemons.

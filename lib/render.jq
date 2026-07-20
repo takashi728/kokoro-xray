@@ -93,18 +93,24 @@ def exit_tor_outbound: if cfg.tor.enabled then
   [{ tag: "TOR", protocol: "socks", settings: { servers: [{ address: "127.0.0.1", port: cfg.tor.socks_port }] } }]
 else [] end;
 
-def wg_outbound: if cfg.multinode.enabled then
+def exit_relay_outbound: if cfg.multinode.enabled then
   [{
-    tag: "WG_TO_EXIT",
-    protocol: "wireguard",
+    tag: "VLESS_PQC_TO_EXIT",
+    protocol: "vless",
     settings: {
-      secretKey: sec.multinode.edge_wg_privkey,
-      address: ["\((cfg.multinode.local_wg_ip))/32"],
-      peers: [{
-        publicKey: cfg.multinode.peer_exit_pubkey,
-        endpoint: "\(cfg.multinode.exit_ip):\(cfg.multinode.exit_port)",
-        allowedIPs: ["0.0.0.0/0", "::/0"]
+      vnext: [{
+        address: cfg.multinode.exit_ip,
+        port: cfg.multinode.exit_port,
+        users: [{
+          id: sec.multinode.exit_vless_uuid,
+          flow: "xtls-rprx-vision-udp443",
+          encryption: sec.multinode.exit_vless_encryption
+        }]
       }]
+    },
+    streamSettings: {
+      network: "raw",
+      security: "none"
     }
   }]
 else [] end;
@@ -161,7 +167,7 @@ def edge_single_routing: {
 def edge_multinode_routing: {
   domainStrategy: "IPIfNonMatch",
   rules: [
-    { type: "field", network: "tcp,udp", outboundTag: "WG_TO_EXIT" }
+    { type: "field", network: "tcp,udp", outboundTag: "VLESS_PQC_TO_EXIT" }
   ]
 };
 
@@ -173,24 +179,28 @@ def edge_inbounds:
 
 def edge_config: log_block + {
   inbounds: edge_inbounds,
-  outbounds: (base_outbounds + wg_outbound),
+  outbounds: (base_outbounds + exit_relay_outbound),
   routing: edge_routing,
   policy: policy_block.policy
 };
 
 def exit_inbound: {
-  tag: "WG_EXIT_IN",
+  tag: "VLESS_PQC_EXIT_IN",
   listen: "0.0.0.0",
   port: cfg.multinode.exit_port,
-  protocol: "wireguard",
+  protocol: "vless",
   settings: {
-    secretKey: sec.multinode.exit_wg_privkey,
-    mtu: 1420,
-    peers: [{
-      publicKey: cfg.multinode.peer_edge_pubkey,
-      allowedIPs: ["\((cfg.multinode.peer_wg_ip))/32"]
-    }]
-  }
+    users: [{
+      id: sec.multinode.exit_vless_uuid,
+      flow: "xtls-rprx-vision"
+    }],
+    decryption: sec.multinode.exit_vless_decryption
+  },
+  streamSettings: {
+    network: "raw",
+    security: "none"
+  },
+  sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
 };
 
 def exit_config: log_block + {

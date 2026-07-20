@@ -13,11 +13,11 @@ kokoro_tor_install() {
 }
 
 kokoro_tor_require_exit() {
-    local role peer
+    local role edge_ip
     role="$(kokoro_cfg '.role')"
     [[ "$role" == "exit" ]] || kokoro_die "Tor runs on the exit node only (after multinode pair)"
-    peer="$(kokoro_cfg '.multinode.peer_edge_pubkey')"
-    [[ -n "$peer" && "$peer" != "null" ]] || kokoro_die "pair edge node first: kokoro-xray pair"
+    edge_ip="$(kokoro_cfg '.multinode.edge_ip')"
+    [[ -n "$edge_ip" && "$edge_ip" != "null" ]] || kokoro_die "pair edge node first: kokoro-xray pair"
 }
 
 kokoro_tor_enable() {

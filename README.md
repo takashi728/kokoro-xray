@@ -7,7 +7,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Supported Modes
 
 - Edge single-node: VLESS XHTTP REALITY, TLS, or both
-- Edge + exit: edge forwards traffic to an exit over WireGuard
+- Edge + exit: edge forwards traffic through post-quantum VLESS Encryption
 - TLS edge: Caddy handles ACME and HTTPS routing
 - REALITY edge: Xray serves public `:443` directly
 
@@ -17,25 +17,30 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 - Root access
 - `443/tcp` open on edge nodes
 - `80/tcp` open on TLS edge nodes for ACME
-- Exit node UDP port open when using edge + exit, default `51820/udp`
+- Exit node `51820/tcp` allowed from the edge public IPv4 only
 - Xray-core `v26.3.27` or newer on REALITY clients
 
 ## Install
 
+This branch is intentionally separate from the default WireGuard design:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-vless-pqc/install.sh \
+  | sudo bash -s -- --branch feature/exit-vless-pqc
 ```
 
 Install and immediately start edge setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --edge
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-vless-pqc/install.sh \
+  | sudo bash -s -- --branch feature/exit-vless-pqc --edge
 ```
 
 Install and immediately start exit setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --exit
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-vless-pqc/install.sh \
+  | sudo bash -s -- --branch feature/exit-vless-pqc --exit
 ```
 
 ## Update
@@ -43,14 +48,15 @@ curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install
 Normal update keeps existing state:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-vless-pqc/install.sh \
+  | sudo bash -s -- --branch feature/exit-vless-pqc
 sudo kokoro-xray apply
 ```
 
 Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 
 ```bash
-sudo kokoro-xray reinstall --branch main
+sudo kokoro-xray reinstall --branch feature/exit-vless-pqc
 sudo kokoro-xray apply
 ```
 
@@ -71,15 +77,20 @@ Edge + exit:
 # On exit
 sudo kokoro-xray exit
 
-# On edge
+# Copy the one-line exit relay bundle, then on edge
 sudo kokoro-xray edge
 sudo kokoro-xray pair
 sudo kokoro-xray apply
 
-# Back on exit, paste edge peer info when prompted
+# Back on exit, enter the edge public IPv4
 sudo kokoro-xray pair
 sudo kokoro-xray apply
 ```
+
+The relay uses ML-KEM-768 authenticated VLESS Encryption over a direct RAW
+transport. The edge routes TCP and UDP through the encrypted VLESS outbound;
+XUDP carries UDP. The exit firewall does not expose the relay port globally:
+UFW permits only the configured edge IPv4.
 
 ## Client Output
 
@@ -104,7 +115,7 @@ Use JSON export for TLS mode when the client app does not preserve advanced XHTT
 | `edge [--keep-secrets]` | Install or update edge node |
 | `exit [--keep-secrets]` | Install or update exit node |
 | `apply` | Render, validate, and reload services |
-| `pair` | Exchange edge/exit WireGuard peer info |
+| `pair` | Exchange edge/exit PQ relay information |
 | `link [--json tls]` | Print client links or TLS JSON |
 | `status` | Show service and config status |
 | `validate` | Validate rendered configs |
@@ -115,7 +126,7 @@ Use JSON export for TLS mode when the client app does not preserve advanced XHTT
 | `reality scan` | Probe REALITY targets |
 | `vless-encryption on\|off\|status` | Manage VLESS payload encryption |
 | `tor on\|off` | Optional exit-node Tor routing |
-| `reinstall --branch main` | Clean reinstall code, keep state |
+| `reinstall --branch feature/exit-vless-pqc` | Clean reinstall code, keep state |
 
 ## VLESS Encryption
 
@@ -162,6 +173,7 @@ The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect b
 - Caddy builds are pinned and rebuilt only when needed.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
 - UFW defaults to deny incoming and allow outgoing when firewall support is enabled.
+- This branch prioritizes post-quantum forward secrecy over gaming-specific UDP behavior.
 
 ## License
 

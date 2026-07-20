@@ -4,7 +4,7 @@
   "menu_exit": "安装 / 更新出口节点",
   "menu_link": "显示分享链接",
   "menu_apply": "应用配置 (渲染 + 重载)",
-  "menu_pair": "配对边缘 ↔ 出口 (WG 密钥)",
+  "menu_pair": "配对边缘 ↔ 出口 (PQ 中继)",
   "menu_tor_on": "在出口节点启用 Tor (.onion，多节点)",
   "menu_tor_off": "在出口节点禁用 Tor",
   "menu_status": "显示状态",

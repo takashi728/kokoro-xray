@@ -37,16 +37,17 @@ kokoro_health() {
             ip="$(kokoro_cfg '.multinode.exit_ip')"
             port="$(kokoro_cfg '.multinode.exit_port')"
             if command -v nc >/dev/null 2>&1; then
-                nc -zvu -w 2 "$ip" "$port" 2>/dev/null && echo "exit wg:  udp ${ip}:${port} reachable" \
-                    || echo "exit wg:  udp ${ip}:${port} NOT reachable"
+                nc -zv -w 2 "$ip" "$port" 2>/dev/null && echo "exit pq:  tcp ${ip}:${port} reachable" \
+                    || echo "exit pq:  tcp ${ip}:${port} NOT reachable"
             else
-                echo "exit wg:  check UDP ${ip}:${port} manually"
+                echo "exit pq:  check TCP ${ip}:${port} manually"
             fi
         fi
     fi
 
     if [[ "$role" == "exit" ]]; then
-        echo "wg port:  $(kokoro_cfg '.multinode.exit_port')/udp"
+        echo "pq port:  $(kokoro_cfg '.multinode.exit_port')/tcp"
+        echo "edge IP:  $(kokoro_cfg '.multinode.edge_ip')"
         if [[ "$(kokoro_cfg '.tor.enabled')" == "true" ]]; then
             echo "tor:      $(systemctl is-active tor 2>/dev/null || echo unknown)"
         fi
