@@ -102,6 +102,7 @@ def wg_outbound: if cfg.multinode.enabled then
       address: ["\((cfg.multinode.local_wg_ip))/32"],
       peers: [{
         publicKey: cfg.multinode.peer_exit_pubkey,
+        preSharedKey: sec.multinode.wg_preshared_key,
         endpoint: "\(cfg.multinode.exit_ip):\(cfg.multinode.exit_port)",
         allowedIPs: ["0.0.0.0/0", "::/0"]
       }]
@@ -188,6 +189,7 @@ def exit_inbound: {
     mtu: 1420,
     peers: [{
       publicKey: cfg.multinode.peer_edge_pubkey,
+      preSharedKey: sec.multinode.wg_preshared_key,
       allowedIPs: ["\((cfg.multinode.peer_wg_ip))/32"]
     }]
   }

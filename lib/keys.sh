@@ -87,6 +87,20 @@ kokoro_gen_exit_wg_keys() {
     kokoro_sec_set_str '.multinode.exit_wg_pubkey' "$pub"
 }
 
+kokoro_gen_wg_preshared_key() {
+    kokoro_sec_set_str '.multinode.wg_preshared_key' "$(wg genpsk)"
+}
+
+kokoro_ensure_wg_preshared_key() {
+    local psk
+    [[ "$(kokoro_cfg '.role')" == "exit" ]] || return 0
+    psk="$(kokoro_sec '.multinode.wg_preshared_key')"
+    if [[ -z "$psk" || "$psk" == "null" ]]; then
+        kokoro_gen_wg_preshared_key
+        kokoro_log "generated WireGuard preshared key"
+    fi
+}
+
 kokoro_secrets_exist() {
     local role
     role="$(kokoro_cfg '.role')"
@@ -118,6 +132,7 @@ kokoro_gen_edge_secrets() {
 
 kokoro_gen_exit_secrets() {
     kokoro_gen_exit_wg_keys
+    kokoro_gen_wg_preshared_key
 }
 
 kokoro_gen_secrets() {

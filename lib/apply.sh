@@ -14,6 +14,7 @@ kokoro_apply() {
     kokoro_need_root
     kokoro_ensure_state
     kokoro_ensure_vless_encryption_keys
+    kokoro_ensure_wg_preshared_key
 
     kokoro_preflight
     kokoro_snapshot_save

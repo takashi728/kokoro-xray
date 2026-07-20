@@ -7,7 +7,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Supported Modes
 
 - Edge single-node: VLESS XHTTP REALITY, TLS, or both
-- Edge + exit: edge forwards traffic to an exit over WireGuard
+- Edge + exit: edge forwards traffic over embedded WireGuard with a unique preshared key
 - TLS edge: Caddy handles ACME and HTTPS routing
 - REALITY edge: Xray serves public `:443` directly
 
@@ -80,6 +80,11 @@ sudo kokoro-xray apply
 sudo kokoro-xray pair
 sudo kokoro-xray apply
 ```
+
+The exit generates the WireGuard public key and a unique 256-bit preshared key.
+Transfer both to the edge through a trusted channel. The preshared key is kept
+only in `secrets.json` and mixed into every WireGuard handshake as a
+post-quantum hedge.
 
 ## Client Output
 

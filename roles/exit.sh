@@ -40,6 +40,7 @@ kokoro_exit_install() {
             kokoro_log "keeping existing secrets"
         fi
     fi
+    kokoro_ensure_wg_preshared_key
 
     if [[ -z "$(kokoro_cfg '.multinode.peer_edge_pubkey')" || "$(kokoro_cfg '.multinode.peer_edge_pubkey')" == "null" ]]; then
         if [[ -t 0 ]]; then
@@ -59,6 +60,7 @@ kokoro_exit_install() {
     fi
     kokoro_network_tune || true
     kokoro_log "exit pubkey (paste on edge): $(kokoro_sec '.multinode.exit_wg_pubkey')"
+    kokoro_log "exit PSK (paste on edge): $(kokoro_sec '.multinode.wg_preshared_key')"
     kokoro_log "open UDP $(kokoro_cfg '.multinode.exit_port') on firewall"
 }
 

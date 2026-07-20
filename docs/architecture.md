@@ -12,7 +12,7 @@
 | File | Mode | Contents |
 |------|------|----------|
 | `~/.kokoro-xray/config.json` | 644 | role, mode, domains, routing preset |
-| `~/.kokoro-xray/secrets.json` | 600 | uuid, keys, wg private keys |
+| `~/.kokoro-xray/secrets.json` | 600 | uuid, keys, WG private keys and pair PSK |
 | `~/.kokoro-xray/last-good/` | 700 | rollback snapshots |
 
 ## Apply pipeline
@@ -48,6 +48,11 @@ Scores by latency + OCSP bonus.
 
 ## Multi-node pairing
 
-1. Install **exit** → copy `exit_wg_pubkey`
-2. Install **edge** with exit IP + pubkey, or run `kokoro-xray pair`
+1. Install **exit** → copy `exit_wg_pubkey` and `exit_wg_psk`
+2. Install **edge** with exit IP, pubkey and PSK, or run `kokoro-xray pair`
 3. Paste `edge_wg_pubkey` back on exit → `kokoro-xray apply`
+
+The PSK is generated once per pair on the exit, stored only in
+`secrets.json`, and rendered as `preSharedKey` on both embedded Xray WireGuard
+peers. It supplements WireGuard's Curve25519 handshake; it does not replace
+the normal WireGuard keys.

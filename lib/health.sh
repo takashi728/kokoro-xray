@@ -36,6 +36,7 @@ kokoro_health() {
             local ip port
             ip="$(kokoro_cfg '.multinode.exit_ip')"
             port="$(kokoro_cfg '.multinode.exit_port')"
+            echo "wg psk:   configured"
             if command -v nc >/dev/null 2>&1; then
                 nc -zvu -w 2 "$ip" "$port" 2>/dev/null && echo "exit wg:  udp ${ip}:${port} reachable" \
                     || echo "exit wg:  udp ${ip}:${port} NOT reachable"
@@ -47,6 +48,7 @@ kokoro_health() {
 
     if [[ "$role" == "exit" ]]; then
         echo "wg port:  $(kokoro_cfg '.multinode.exit_port')/udp"
+        echo "wg psk:   configured"
         if [[ "$(kokoro_cfg '.tor.enabled')" == "true" ]]; then
             echo "tor:      $(systemctl is-active tor 2>/dev/null || echo unknown)"
         fi

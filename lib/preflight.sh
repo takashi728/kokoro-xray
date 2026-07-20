@@ -68,6 +68,7 @@ kokoro_preflight_edge() {
 
     if [[ "$(kokoro_cfg '.multinode.enabled')" == "true" ]]; then
         [[ -n "$(kokoro_sec '.multinode.edge_wg_privkey')" ]] || kokoro_die "missing edge WG private key"
+        [[ -n "$(kokoro_sec '.multinode.wg_preshared_key')" ]] || kokoro_die "missing WG preshared key"
         [[ -n "$(kokoro_cfg '.multinode.peer_exit_pubkey')" ]] || kokoro_die "missing multinode.peer_exit_pubkey"
         [[ -n "$(kokoro_cfg '.multinode.exit_ip')" ]] || kokoro_die "missing multinode.exit_ip"
     fi
@@ -75,6 +76,7 @@ kokoro_preflight_edge() {
 
 kokoro_preflight_exit() {
     [[ -n "$(kokoro_sec '.multinode.exit_wg_privkey')" ]] || kokoro_die "missing exit WG private key"
+    [[ -n "$(kokoro_sec '.multinode.wg_preshared_key')" ]] || kokoro_die "missing WG preshared key"
     [[ -n "$(kokoro_cfg '.multinode.peer_edge_pubkey')" ]] || kokoro_die "missing multinode.peer_edge_pubkey (run pair)"
 
     if [[ "$(kokoro_cfg '.tor.enabled')" == "true" ]]; then

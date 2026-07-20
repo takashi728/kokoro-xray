@@ -14,6 +14,7 @@ jq -n -f "${ROOT}/lib/render.jq" \
 jq -e '.inbounds | length == 2' "${OUT}/edge-xray.json" >/dev/null
 jq -e '(.outbounds | map(.tag) | index("TOR")) | not' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.outbounds | map(.tag) | index("WG_TO_EXIT")' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="WG_TO_EXIT") | .settings.peers[0].preSharedKey == "XSU70MSxWYuaI7OGzl2BE2gN46aI4jHSBwtBRbp28yY="' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "WG_TO_EXIT"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .listen == "127.0.0.1"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/edge-xray.json" >/dev/null
@@ -64,6 +65,7 @@ jq -n -f "${ROOT}/lib/render.jq" \
     --slurpfile sec "${FIX}/exit-secrets.json" \
     >"${OUT}/exit-xray.json"
 jq -e '.inbounds[0].protocol == "wireguard"' "${OUT}/exit-xray.json" >/dev/null
+jq -e '.inbounds[0].settings.peers[0].preSharedKey == "XSU70MSxWYuaI7OGzl2BE2gN46aI4jHSBwtBRbp28yY="' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.outbounds | map(.tag) | index("TOR")' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[0].outboundTag == "TOR"' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "DIRECT"' "${OUT}/exit-xray.json" >/dev/null

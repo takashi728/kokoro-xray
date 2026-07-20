@@ -60,11 +60,14 @@ kokoro_edge_install() {
     if [[ -t 0 && "$(kokoro_cfg '.multinode.enabled')" != "true" ]]; then
         read -r -p "Enable multinode WG to exit? [y/N] " mn
         if [[ "$mn" =~ ^[Yy]$ ]]; then
-            local ip pub
+            local ip pub psk
             read -r -p "Exit node IP: " ip
             read -r -p "Exit WG public key: " pub
+            read -r -s -p "Exit WG preshared key: " psk
+            echo
             kokoro_cfg_set_str '.multinode.exit_ip' "$ip"
             kokoro_cfg_set_str '.multinode.peer_exit_pubkey' "$pub"
+            kokoro_sec_set_str '.multinode.wg_preshared_key' "$psk"
             kokoro_cfg_set '.multinode.enabled' 'true'
         fi
     fi
