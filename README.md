@@ -23,19 +23,22 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-wg-psk/install.sh \
+  | sudo bash -s -- --branch feature/exit-wg-psk
 ```
 
 Install and immediately start edge setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --edge
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-wg-psk/install.sh \
+  | sudo bash -s -- --branch feature/exit-wg-psk --edge
 ```
 
 Install and immediately start exit setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --exit
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-wg-psk/install.sh \
+  | sudo bash -s -- --branch feature/exit-wg-psk --exit
 ```
 
 ## Update
@@ -43,14 +46,15 @@ curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install
 Normal update keeps existing state:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/exit-wg-psk/install.sh \
+  | sudo bash -s -- --branch feature/exit-wg-psk
 sudo kokoro-xray apply
 ```
 
 Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 
 ```bash
-sudo kokoro-xray reinstall --branch main
+sudo kokoro-xray reinstall --branch feature/exit-wg-psk
 sudo kokoro-xray apply
 ```
 
@@ -120,7 +124,7 @@ Use JSON export for TLS mode when the client app does not preserve advanced XHTT
 | `reality scan` | Probe REALITY targets |
 | `vless-encryption on\|off\|status` | Manage VLESS payload encryption |
 | `tor on\|off` | Optional exit-node Tor routing |
-| `reinstall --branch main` | Clean reinstall code, keep state |
+| `reinstall --branch feature/exit-wg-psk` | Clean reinstall code, keep state |
 
 ## VLESS Encryption
 
