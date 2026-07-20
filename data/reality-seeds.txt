@@ -26,3 +26,13 @@ www.amazon.com
 www.yahoo.com
 www.j-wave.co.jp
 www.lovelive-anime.jp
+
+# Gaming storefronts and publishers; always revalidated from the node.
+store.ubisoft.com
+www.gog.com
+www.humblebundle.com
+www.ea.com
+www.larian.com
+www.team17.com
+www.grindinggear.com
+www.square-enix-games.com

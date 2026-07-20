@@ -21,6 +21,15 @@ test_normalize() {
     echo "normalize OK"
 }
 
+test_seeds() {
+    local host
+    while IFS= read -r host; do
+        [[ -z "$host" || "$host" == \#* ]] && continue
+        ! kokoro_reality_blocked "$host"
+    done <"${ROOT}/data/reality-seeds.txt"
+    echo "seed policy OK"
+}
+
 test_apply_host() {
     local tmp_home cfg
     tmp_home="$(mktemp -d)"
@@ -43,6 +52,7 @@ test_apply_host() {
 
 test_blocked
 test_normalize
+test_seeds
 test_apply_host
 
 # Live probe (optional, needs network)
