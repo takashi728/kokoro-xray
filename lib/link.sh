@@ -4,22 +4,31 @@
 : "${KOKORO_ROOT:=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 source "${KOKORO_ROOT}/lib/common.sh"
 
+kokoro_link_vless_encryption() {
+    if [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled // false')" == "true" ]]; then
+        kokoro_sec '.inbound.vless_encryption.encryption'
+    else
+        printf 'none\n'
+    fi
+}
+
 kokoro_link_tls_url() {
     kokoro_ensure_state
-    local uuid path mode cdn
+    local uuid path mode cdn encryption
     mode="$(kokoro_cfg '.inbound.mode')"
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 0
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
     cdn="$(kokoro_cfg '.inbound.tls.cdn_domain')"
+    encryption="$(kokoro_link_vless_encryption)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 0
-    printf 'vless://%s@%s:443?encryption=none&security=tls&type=xhttp&path=%s&host=%s&sni=%s&fp=chrome&alpn=h2#kokoro-tls\n' \
-        "$uuid" "$cdn" "$path" "$cdn" "$cdn"
+    printf 'vless://%s@%s:443?encryption=%s&security=tls&type=xhttp&path=%s&host=%s&sni=%s&fp=chrome&alpn=h2#kokoro-tls\n' \
+        "$uuid" "$cdn" "$encryption" "$path" "$cdn" "$cdn"
 }
 
 kokoro_link_reality_url() {
     kokoro_ensure_state
-    local uuid path sni pub sid mode host
+    local uuid path sni pub sid mode host encryption
     mode="$(kokoro_cfg '.inbound.mode')"
     [[ "$mode" == "reality" || "$mode" == "both" ]] || return 0
     uuid="$(kokoro_sec '.inbound.uuid')"
@@ -27,25 +36,28 @@ kokoro_link_reality_url() {
     sni="$(kokoro_cfg '.inbound.reality.server_names[0]')"
     pub="$(kokoro_sec '.inbound.reality.public_key')"
     sid="$(kokoro_sec '.inbound.reality.short_ids[0]')"
+    encryption="$(kokoro_link_vless_encryption)"
     host="$(curl -4 -s ifconfig.me 2>/dev/null || echo 'YOUR_VPS_IP')"
-    printf 'vless://%s@%s:443?encryption=none&security=reality&type=xhttp&path=%s&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-reality\n' \
-        "$uuid" "$host" "$path" "$pub" "$sni" "$sid"
+    printf 'vless://%s@%s:443?encryption=%s&security=reality&type=xhttp&path=%s&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-reality\n' \
+        "$uuid" "$host" "$encryption" "$path" "$pub" "$sni" "$sid"
 }
 
 kokoro_link_tls_json() {
     kokoro_ensure_state
-    local uuid path mode cdn
+    local uuid path mode cdn encryption
     mode="$(kokoro_cfg '.inbound.mode')"
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 1
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
     cdn="$(kokoro_cfg '.inbound.tls.cdn_domain')"
+    encryption="$(kokoro_link_vless_encryption)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 1
 
     jq -n \
         --arg uuid "$uuid" \
         --arg path "$path" \
         --arg cdn "$cdn" \
+        --arg encryption "$encryption" \
         '{
           log: { loglevel: "warning" },
           dns: {
@@ -84,7 +96,7 @@ kokoro_link_tls_json() {
                     users: [
                       {
                         id: $uuid,
-                        encryption: "none",
+                        encryption: $encryption,
                         flow: ""
                       }
                     ]

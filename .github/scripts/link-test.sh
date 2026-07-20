@@ -13,11 +13,13 @@ set -euo pipefail
 source "${KOKORO_ROOT}/lib/link.sh"
 
 expected_pbk="$(kokoro_sec '.inbound.reality.public_key')"
+expected_encryption="$(kokoro_sec '.inbound.vless_encryption.encryption')"
 reality="$(kokoro_link_reality_url | tr -d '\n')"
 [[ "$reality" == vless://* ]]
 [[ "$reality" == *"security=reality"* ]]
 [[ "$reality" == *"type=xhttp"* ]]
 [[ "$reality" == *"pbk=${expected_pbk}"* ]]
+[[ "$reality" == *"encryption=${expected_encryption}"* ]]
 
 tls="$(kokoro_link_tls_url | tr -d '\n')"
 [[ "$tls" == vless://* ]]
@@ -27,6 +29,7 @@ tls="$(kokoro_link_tls_url | tr -d '\n')"
 [[ "$tls" == *"sni=cdn.example.com"* ]]
 [[ "$tls" == *"fp=chrome"* ]]
 [[ "$tls" == *"alpn=h2"* ]]
+[[ "$tls" == *"encryption=${expected_encryption}"* ]]
 
 tls_json="$(kokoro_link_tls_json)"
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].tag == "kokoro-tls"' >/dev/null
@@ -35,6 +38,7 @@ printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serv
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.fingerprint == "chrome"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.alpn[0] == "h2"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.mode == "auto"' >/dev/null
+printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConnections == "6"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConcurrency == null' >/dev/null
@@ -61,6 +65,10 @@ if command -v xray >/dev/null 2>&1; then
     printf '%s\n' "$cli_tls_json" >"${HOME}/.kokoro-xray/client-tls.json"
     xray run -test -config "${HOME}/.kokoro-xray/client-tls.json"
 fi
+
+kokoro_cfg_set '.inbound.vless_encryption.enabled' 'false'
+disabled_tls="$(kokoro_link_tls_url | tr -d '\n')"
+[[ "$disabled_tls" == *"encryption=none"* ]]
 SCRIPT
 
 rm -rf "$tmp_home"

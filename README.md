@@ -113,8 +113,27 @@ Use JSON export for TLS mode when the client app does not preserve advanced XHTT
 | `firewall apply` | Re-apply configured UFW rules |
 | `tune` | Apply optional network tuning |
 | `reality scan` | Probe REALITY targets |
+| `vless-encryption on\|off\|status` | Manage VLESS payload encryption |
 | `tor on\|off` | Optional exit-node Tor routing |
 | `reinstall --branch main` | Clean reinstall code, keep state |
+
+## VLESS Encryption
+
+Fresh edge installs enable Xray-core VLESS Encryption. The official
+`xray vlessenc` command generates one X25519-authenticated pair; ephemeral key
+exchange remains post-quantum safe. Server and client strings stay in
+`secrets.json`.
+
+Existing nodes upgrade with encryption disabled to preserve current clients:
+
+```bash
+sudo kokoro-xray vless-encryption on
+kokoro-xray link
+```
+
+Enabling or disabling changes every client profile. Refresh links afterward.
+The VLESS layer protects payloads inside XHTTP; TLS or REALITY remains required
+for transport security and censorship resistance.
 
 ## REALITY Target Scan
 

@@ -5,6 +5,11 @@ def cfg: $cfg[0];
 def sec: $sec[0];
 def mode: cfg.inbound.mode;
 def role: cfg.role;
+def vless_decryption:
+  if cfg.inbound.vless_encryption.enabled
+  then sec.inbound.vless_encryption.decryption
+  else "none"
+  end;
 
 def log_block: { log: { loglevel: "warning" } };
 
@@ -42,7 +47,7 @@ def reality_inbound: {
   protocol: "vless",
   settings: {
     clients: [{ id: sec.inbound.uuid, flow: "" }],
-    decryption: "none"
+    decryption: vless_decryption
   },
   streamSettings: {
     network: "xhttp",
@@ -68,7 +73,7 @@ def tls_inbound: {
   protocol: "vless",
   settings: {
     clients: [{ id: sec.inbound.uuid, flow: "" }],
-    decryption: "none"
+    decryption: vless_decryption
   },
   streamSettings: {
     network: "xhttp",

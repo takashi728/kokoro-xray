@@ -20,6 +20,7 @@ SCRIPT
 printf '%s\n' "$out" | grep -q 'TLS mode client note'
 printf '%s\n' "$out" | grep -q 'Please use HApp'
 printf '%s\n' "$out" | grep -q 'kokoro-xray link --json tls'
+printf '%s\n' "$out" | grep -q 'vless enc:'
 
 rm -rf "$tmp_home"
 echo "health-test OK"

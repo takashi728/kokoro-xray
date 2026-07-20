@@ -22,6 +22,7 @@ kokoro_health() {
     if [[ "$role" == "edge" ]]; then
         local mode
         mode="$(kokoro_cfg '.inbound.mode')"
+        echo "vless enc: $(kokoro_cfg '.inbound.vless_encryption.enabled // false')"
         if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
             echo "caddy:    $(systemctl is-active caddy 2>/dev/null || echo unknown)"
         fi

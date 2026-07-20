@@ -55,6 +55,15 @@ kokoro_dispatch() {
             kokoro_need_root
             kokoro_geodata_update
             ;;
+        vless-encryption)
+            source "${KOKORO_ROOT}/lib/vless-encryption.sh"
+            case "${1:-}" in
+                on) kokoro_vless_encryption_enable ;;
+                off) kokoro_vless_encryption_disable ;;
+                status) kokoro_vless_encryption_status ;;
+                *) kokoro_die "usage: kokoro-xray vless-encryption on|off|status" ;;
+            esac
+            ;;
         reality)
             case "${1:-}" in
                 scan) shift; bash "${KOKORO_ROOT}/roles/reality-scan.sh" "$@" ;;

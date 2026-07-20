@@ -3,6 +3,7 @@
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 source "${KOKORO_ROOT}/lib/snapshot.sh"
+source "${KOKORO_ROOT}/lib/keys.sh"
 source "${KOKORO_ROOT}/lib/preflight.sh"
 source "${KOKORO_ROOT}/lib/render.sh"
 source "${KOKORO_ROOT}/lib/validate.sh"
@@ -12,6 +13,7 @@ source "${KOKORO_ROOT}/lib/firewall.sh"
 kokoro_apply() {
     kokoro_need_root
     kokoro_ensure_state
+    kokoro_ensure_vless_encryption_keys
 
     kokoro_preflight
     kokoro_snapshot_save

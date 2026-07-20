@@ -1,9 +1,12 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "language": "en",
   "role": "edge",
   "inbound": {
     "mode": "both",
+    "vless_encryption": {
+      "enabled": true
+    },
     "reality": {
       "dest": "www.cloudflare.com:443",
       "server_names": ["www.cloudflare.com"]

@@ -15,6 +15,14 @@ kokoro_migrate() {
         kokoro_log "migrated config 0.1.0 → 0.2.0"
     fi
 
+    ver="$(kokoro_cfg '.version')"
+    if [[ "$ver" == "0.2.0" ]]; then
+        kokoro_cfg_set '.inbound.vless_encryption.enabled' 'false'
+        kokoro_cfg_set_str '.version' '0.3.0'
+        kokoro_sec_set_str '.version' '0.3.0'
+        kokoro_log "migrated config 0.2.0 → 0.3.0 (VLESS Encryption disabled)"
+    fi
+
     if ! jq -e '.firewall' "${KOKORO_CONFIG}" >/dev/null 2>&1; then
         tmp="$(mktemp)"
         jq '.firewall = {"enabled": true, "ssh_port": 0, "extra_allow": []}' \

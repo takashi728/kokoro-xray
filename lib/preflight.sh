@@ -37,7 +37,7 @@ kokoro_preflight_paths() {
 }
 
 kokoro_preflight_edge() {
-    local mode="$1" cdn
+    local mode="$1" cdn decryption encryption
     case "$mode" in
         reality|tls|both) ;;
         *) kokoro_die "invalid inbound.mode: $mode" ;;
@@ -45,6 +45,12 @@ kokoro_preflight_edge() {
 
     [[ -n "$(kokoro_sec '.inbound.uuid')" ]] || kokoro_die "missing inbound.uuid in secrets.json"
     [[ -n "$(kokoro_sec '.inbound.xhttp_path')" ]] || kokoro_die "missing inbound.xhttp_path in secrets.json"
+    if [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled // false')" == "true" ]]; then
+        decryption="$(kokoro_sec '.inbound.vless_encryption.decryption')"
+        encryption="$(kokoro_sec '.inbound.vless_encryption.encryption')"
+        [[ -n "$decryption" && "$decryption" != "null" ]] || kokoro_die "missing VLESS decryption key"
+        [[ -n "$encryption" && "$encryption" != "null" ]] || kokoro_die "missing VLESS encryption key"
+    fi
 
     if [[ "$mode" == "reality" || "$mode" == "both" ]]; then
         [[ -n "$(kokoro_sec '.inbound.reality.private_key')" ]] || kokoro_die "missing reality private key"

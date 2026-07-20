@@ -16,6 +16,8 @@ jq -e '(.outbounds | map(.tag) | index("TOR")) | not' "${OUT}/edge-xray.json" >/
 jq -e '.outbounds | map(.tag) | index("WG_TO_EXIT")' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "WG_TO_EXIT"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .listen == "127.0.0.1"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .settings.decryption | startswith("mlkem768x25519plus.native.600s.")' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .streamSettings.xhttpSettings.mode == null' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.mode == "auto"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xPaddingObfsMode == true' "${OUT}/edge-xray.json" >/dev/null
@@ -36,6 +38,14 @@ jq -e '.routing.rules | map(select(.domain[]? == "regexp:.*\\.ru$")) | length > 
 jq -e '.routing.rules | map(select(.domain[]? == "regexp:.*\\.su$")) | length > 0' "${OUT}/edge-single-xray.json" >/dev/null
 jq -e '.routing.rules | map(select(.ip[]? == "geoip:ru")) | length > 0' "${OUT}/edge-single-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "DIRECT"' "${OUT}/edge-single-xray.json" >/dev/null
+
+echo "== edge VLESS Encryption disabled =="
+jq '.inbound.vless_encryption.enabled = false' "${FIX}/edge-single-config.json" >"${OUT}/edge-disabled-config.json"
+jq -n -f "${ROOT}/lib/render.jq" \
+    --slurpfile cfg "${OUT}/edge-disabled-config.json" \
+    --slurpfile sec "${FIX}/edge-secrets.json" \
+    >"${OUT}/edge-disabled-xray.json"
+jq -e '.inbounds[0].settings.decryption == "none"' "${OUT}/edge-disabled-xray.json" >/dev/null
 
 echo "== edge caddy =="
 jq -n -r -f "${ROOT}/lib/caddy.jq" \

@@ -32,6 +32,13 @@ preflight.sh → render.jq + caddy.jq → validate.sh → firewall.sh → reload
 Caddy overwrites `Kokoro-Trusted-XFF` on TLS proxy requests. Xray trusts
 `X-Forwarded-For` only when that marker arrives over its loopback listener.
 
+## VLESS Encryption
+
+Fresh edge installs generate one official X25519-authenticated VLESS Encryption
+pair. Both REALITY and TLS inbounds use the same server decryption string, and
+client exports use its matching encryption string. Existing `0.2.0` nodes
+migrate with this layer disabled to avoid breaking deployed clients.
+
 ## REALITY scan
 
 `kokoro-xray reality scan` probes `data/reality-seeds.txt` plus optional `--domains` / `--file`.
