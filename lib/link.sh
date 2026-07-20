@@ -104,7 +104,7 @@ kokoro_link_tls_json() {
                   host: $cdn,
                   mode: "auto",
                   xmux: {
-                    maxConcurrency: "1-1",
+                    maxConnections: "6",
                     hMaxRequestTimes: "600-900",
                     hMaxReusableSecs: "1800-3000"
                   },

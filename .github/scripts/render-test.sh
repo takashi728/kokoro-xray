@@ -20,7 +20,8 @@ jq -e '.inbounds[] | select(.tag=="REALITY_XHTTP_IN") | .streamSettings.xhttpSet
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.mode == "auto"' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xPaddingObfsMode == true' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xPaddingKey == "v"' "${OUT}/edge-xray.json" >/dev/null
-jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xmux.maxConcurrency == "1-1"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xmux.maxConnections == "6"' "${OUT}/edge-xray.json" >/dev/null
+jq -e '.inbounds[] | select(.tag=="TLS_XHTTP_IN") | .streamSettings.xhttpSettings.xmux.maxConcurrency == null' "${OUT}/edge-xray.json" >/dev/null
 
 echo "== edge single-node xray =="
 jq -n -f "${ROOT}/lib/render.jq" \
