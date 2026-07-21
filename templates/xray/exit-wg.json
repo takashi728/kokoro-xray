@@ -37,11 +37,6 @@
         "type": "field",
         "ip": ["geoip:private"],
         "outboundTag": "BLOCK"
-      },
-      {
-        "type": "field",
-        "protocol": ["bittorrent"],
-        "outboundTag": "BLOCK"
       }
     ]
   },

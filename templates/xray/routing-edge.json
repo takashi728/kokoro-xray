@@ -14,11 +14,6 @@
       },
       {
         "type": "field",
-        "protocol": ["bittorrent"],
-        "outboundTag": "BLOCK"
-      },
-      {
-        "type": "field",
         "domain": ["geosite:cn"],
         "outboundTag": "BLOCK"
       },

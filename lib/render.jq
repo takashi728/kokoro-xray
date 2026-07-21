@@ -131,7 +131,6 @@ def google_direct_rules: [
 def single_node_block_rules: [
   { type: "field", ip: ["geoip:private"], outboundTag: "BLOCK" },
   { type: "field", domain: ["geosite:private"], outboundTag: "BLOCK" },
-  { type: "field", protocol: ["bittorrent"], outboundTag: "BLOCK" },
   {
     type: "field",
     domain: [
@@ -200,7 +199,6 @@ def exit_config: log_block + {
     domainStrategy: "IPIfNonMatch",
     rules: (exit_tor_rules + [
       { type: "field", ip: ["geoip:private"], outboundTag: "BLOCK" },
-      { type: "field", protocol: ["bittorrent"], outboundTag: "BLOCK" },
       { type: "field", network: "tcp,udp", outboundTag: "DIRECT" }
     ])
   },

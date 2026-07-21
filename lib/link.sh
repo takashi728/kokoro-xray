@@ -192,11 +192,6 @@ kokoro_link_tls_json() {
               },
               {
                 type: "field",
-                protocol: ["bittorrent"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
                 domain: [
                   "geosite:cn",
                   "geosite:geolocation-cn",
