@@ -42,9 +42,8 @@ printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outb
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConnections == "6"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConcurrency == null' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.dns.servers | index("https://cloudflare-dns.com/dns-query")' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.dns.servers | index("https://base.dns.mullvad.net/dns-query")' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.dns.queryStrategy == "UseIPv4"' >/dev/null
+printf '%s\n' "$tls_json" | jq -e '.dns.servers == ["https://cloudflare-dns.com/dns-query"]' >/dev/null
+printf '%s\n' "$tls_json" | jq -e '.dns.queryStrategy == "UseIP"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[0].outboundTag == "BLOCK"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[0].domain | index("geosite:category-ads-all")' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[1].outboundTag == "BLOCK"' >/dev/null

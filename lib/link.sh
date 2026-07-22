@@ -61,13 +61,8 @@ kokoro_link_tls_json() {
         '{
           log: { loglevel: "warning" },
           dns: {
-            servers: [
-              "https://cloudflare-dns.com/dns-query",
-              "https://1.1.1.1/dns-query",
-              "https://base.dns.mullvad.net/dns-query",
-              "https://extended.dns.mullvad.net/dns-query"
-            ],
-            queryStrategy: "UseIPv4"
+            servers: ["https://cloudflare-dns.com/dns-query"],
+            queryStrategy: "UseIP"
           },
           inbounds: [
             {
