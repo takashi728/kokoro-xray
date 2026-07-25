@@ -108,6 +108,13 @@ kokoro_need_cmd() {
     command -v "$1" >/dev/null 2>&1 || kokoro_die "missing command: $1"
 }
 
+kokoro_caddy_required() {
+    local mode
+    mode="$(kokoro_cfg '.inbound.mode')"
+    [[ "$mode" == "tls" || "$mode" == "both" ||
+       "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]
+}
+
 kokoro_load_i18n() {
     local lang file
     lang="$(kokoro_cfg '.language')"

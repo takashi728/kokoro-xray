@@ -14,12 +14,11 @@ kokoro_validate_geo() {
 }
 
 kokoro_validate() {
-    local xray_bin cfg caddyfile role mode
+    local xray_bin cfg caddyfile role
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
     cfg="$(kokoro_cfg '.paths.xray_config')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
     role="$(kokoro_cfg '.role')"
-    mode="$(kokoro_cfg '.inbound.mode')"
 
     [[ -f "$cfg" ]] || { kokoro_warn "missing xray config: $cfg"; return 1; }
     [[ -x "$xray_bin" ]] || { kokoro_warn "xray binary not found: $xray_bin"; return 1; }
@@ -27,7 +26,7 @@ kokoro_validate() {
     kokoro_validate_geo || return 1
     "$xray_bin" run -test -config "$cfg" || { kokoro_warn "xray config test failed"; return 1; }
 
-    if [[ "$role" == "edge" && ( "$mode" == "tls" || "$mode" == "both" ) && -f "$caddyfile" ]]; then
+    if [[ "$role" == "edge" ]] && kokoro_caddy_required && [[ -f "$caddyfile" ]]; then
         local caddy_bin
         caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
         if [[ -x "$caddy_bin" ]]; then

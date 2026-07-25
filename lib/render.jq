@@ -5,6 +5,7 @@ def cfg: $cfg[0];
 def sec: $sec[0];
 def mode: cfg.inbound.mode;
 def role: cfg.role;
+def hysteria_enabled: cfg.inbound.hysteria.enabled;
 def vless_decryption:
   if cfg.inbound.vless_encryption.enabled
   then sec.inbound.vless_encryption.decryption
@@ -17,8 +18,8 @@ def policy_block: {
   policy: { levels: { "0": { handshake: 2, connIdle: 120 } } }
 };
 
-def reality_listen: if mode == "reality" then "0.0.0.0" else "127.0.0.1" end;
-def reality_port: if mode == "reality" then 443 else 8443 end;
+def reality_listen: if mode == "reality" and (hysteria_enabled | not) then "0.0.0.0" else "127.0.0.1" end;
+def reality_port: if mode == "reality" and (hysteria_enabled | not) then 443 else 8443 end;
 def xhttp_sockopt: { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] };
 def xhttp_base_settings: { path: sec.inbound.xhttp_path };
 def xhttp_tls_settings: xhttp_base_settings + {
@@ -80,6 +81,55 @@ def tls_inbound: {
     security: "none",
     xhttpSettings: xhttp_tls_settings,
     sockopt: xhttp_sockopt
+  },
+  sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+};
+
+def hysteria_inbound: {
+  tag: "HYSTERIA2_IN",
+  listen: "0.0.0.0",
+  port: cfg.inbound.hysteria.ports,
+  protocol: "hysteria",
+  settings: {
+    version: 2,
+    users: [{ auth: sec.inbound.hysteria.auth, level: 0 }]
+  },
+  streamSettings: {
+    method: "hysteria",
+    security: "tls",
+    tlsSettings: {
+      alpn: ["h3"],
+      certificates: [{
+        certificateFile: cfg.paths.hysteria_cert,
+        keyFile: cfg.paths.hysteria_key
+      }]
+    },
+    hysteriaSettings: {
+      version: 2,
+      udpIdleTimeout: 60,
+      masquerade: {
+        type: "proxy",
+        url: "https://\(cfg.inbound.hysteria.masquerade)/",
+        rewriteHost: true
+      }
+    },
+    finalmask: {
+      udp: [{
+        type: "salamander",
+        settings: {
+          password: sec.inbound.hysteria.obfs_password,
+          packetSize: cfg.inbound.hysteria.packet_size
+        }
+      }],
+      quicParams: {
+        congestion: cfg.inbound.hysteria.congestion,
+        bbrProfile: cfg.inbound.hysteria.bbr_profile,
+        udpHop: {
+          ports: cfg.inbound.hysteria.ports,
+          interval: cfg.inbound.hysteria.hop_interval
+        }
+      }
+    }
   },
   sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
 };
@@ -168,7 +218,8 @@ def edge_routing: if cfg.multinode.enabled then edge_multinode_routing else edge
 
 def edge_inbounds:
   (if mode == "reality" or mode == "both" then [reality_inbound] else [] end)
-  + (if mode == "tls" or mode == "both" then [tls_inbound] else [] end);
+  + (if mode == "tls" or mode == "both" then [tls_inbound] else [] end)
+  + (if hysteria_enabled then [hysteria_inbound] else [] end);
 
 def edge_config: log_block + {
   inbounds: edge_inbounds,

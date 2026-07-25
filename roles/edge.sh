@@ -35,12 +35,6 @@ kokoro_edge_install() {
     kokoro_install_deps
     kokoro_xray_install
 
-    mode="$(kokoro_cfg '.inbound.mode')"
-    if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
-        kokoro_caddy_install
-        kokoro_cf_dns01_hint
-    fi
-
     if [[ "$FORCE_SECRETS" == "true" ]]; then
         kokoro_warn "rotating secrets — existing client links will break"
         kokoro_gen_secrets
@@ -55,6 +49,14 @@ kokoro_edge_install() {
         else
             kokoro_log "keeping existing secrets"
         fi
+    fi
+    kokoro_ensure_hysteria_secrets
+
+    mode="$(kokoro_cfg '.inbound.mode')"
+    if kokoro_caddy_required; then
+        kokoro_caddy_install
+        [[ "$mode" == "tls" || "$mode" == "both" ]] && kokoro_cf_dns01_hint
+        kokoro_hysteria_prepare_certificate
     fi
 
     if [[ -t 0 && "$(kokoro_cfg '.multinode.enabled')" != "true" ]]; then

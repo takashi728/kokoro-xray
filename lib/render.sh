@@ -16,9 +16,8 @@ kokoro_render_xray() {
 }
 
 kokoro_render_caddy() {
-    local out mode
-    mode="$(kokoro_cfg '.inbound.mode')"
-    [[ "$mode" == "tls" || "$mode" == "both" ]] || return 0
+    local out
+    kokoro_caddy_required || return 0
     out="$(kokoro_cfg '.paths.caddyfile')"
     install -d "$(dirname "$out")"
     jq -n -r -f "${KOKORO_ROOT}/lib/caddy.jq" \

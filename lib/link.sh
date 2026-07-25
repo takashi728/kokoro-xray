@@ -42,6 +42,19 @@ kokoro_link_reality_url() {
         "$uuid" "$host" "$encryption" "$path" "$pub" "$sni" "$sid"
 }
 
+kokoro_link_hysteria_url() {
+    kokoro_ensure_state
+    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
+    local auth obfs domain ports
+    auth="$(kokoro_sec '.inbound.hysteria.auth')"
+    obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
+    domain="$(kokoro_cfg '.inbound.hysteria.domain')"
+    ports="$(kokoro_cfg '.inbound.hysteria.ports' | tr -d '[:space:]')"
+    [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 0
+    printf 'hysteria2://%s@%s:%s/?obfs=gecko&obfs-password=%s&sni=%s#kokoro-hysteria2\n' \
+        "$auth" "$domain" "$ports" "$obfs" "$domain"
+}
+
 kokoro_link_tls_json() {
     kokoro_ensure_state
     local uuid path mode cdn encryption
@@ -239,7 +252,7 @@ kokoro_link_qr() {
 
 kokoro_link_show() {
     local show_qr=false json_tls=false
-    local reality_url tls_url
+    local reality_url tls_url hysteria_url
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -256,7 +269,7 @@ kokoro_link_show() {
                 ;;
             -h|--help)
                 cat <<'EOF'
-kokoro-xray link — VLESS share URLs
+kokoro-xray link — proxy share URLs
 
 Usage:
   kokoro-xray link
@@ -280,8 +293,10 @@ EOF
 
     reality_url="$(kokoro_link_reality_url)"
     tls_url="$(kokoro_link_tls_url)"
+    hysteria_url="$(kokoro_link_hysteria_url)"
 
-    [[ -n "$reality_url" || -n "$tls_url" ]] || kokoro_die "no links for role/mode (edge required)"
+    [[ -n "$reality_url" || -n "$tls_url" || -n "$hysteria_url" ]] ||
+        kokoro_die "no links for role/mode (edge required)"
 
     if [[ -n "$reality_url" ]]; then
         printf '%s\n' "$reality_url"
@@ -291,5 +306,10 @@ EOF
     if [[ -n "$tls_url" ]]; then
         printf '%s\n' "$tls_url"
         [[ "$show_qr" == "true" ]] && kokoro_link_qr "$tls_url" "TLS"
+    fi
+
+    if [[ -n "$hysteria_url" ]]; then
+        printf '%s\n' "$hysteria_url"
+        [[ "$show_qr" == "true" ]] && kokoro_link_qr "$hysteria_url" "HYSTERIA2"
     fi
 }

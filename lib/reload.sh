@@ -5,13 +5,16 @@ source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_reload() {
     kokoro_need_root
-    local role mode
+    local role
     role="$(kokoro_cfg '.role')"
-    mode="$(kokoro_cfg '.inbound.mode')"
+
+    if [[ "$role" == "edge" ]] && ! kokoro_caddy_required; then
+        systemctl disable --now caddy >/dev/null 2>&1 || true
+    fi
 
     systemctl restart xray
 
-    if [[ "$role" == "edge" && ( "$mode" == "tls" || "$mode" == "both" ) ]]; then
+    if [[ "$role" == "edge" ]] && kokoro_caddy_required; then
         systemctl enable caddy >/dev/null 2>&1 || true
         systemctl restart caddy
     fi

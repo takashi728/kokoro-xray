@@ -6,8 +6,8 @@ source "${KOKORO_ROOT}/lib/os.sh"
 
 KOKORO_XCADDY_VERSION="${KOKORO_XCADDY_VERSION:-v0.4.6}"
 KOKORO_CADDY_L4_VERSION="${KOKORO_CADDY_L4_VERSION:-v0.1.1}"
-KOKORO_GO_MIN_VERSION="${KOKORO_GO_MIN_VERSION:-1.21.0}"
-KOKORO_GO_VERSION="${KOKORO_GO_VERSION:-1.24.4}"
+KOKORO_GO_MIN_VERSION="${KOKORO_GO_MIN_VERSION:-1.25.0}"
+KOKORO_GO_VERSION="${KOKORO_GO_VERSION:-1.26.5}"
 KOKORO_GO_PREFIX="${KOKORO_GO_PREFIX:-/usr/local/kokoro-go}"
 
 kokoro_caddy_version() {
@@ -21,10 +21,12 @@ kokoro_caddy_version() {
 }
 
 kokoro_caddy_needs_l4() {
-    local mode use_l4
+    local mode use_l4 hysteria
     mode="$(kokoro_cfg '.inbound.mode')"
     use_l4="$(kokoro_cfg '.caddy.use_l4')"
-    [[ "$use_l4" == "true" && "$mode" == "both" ]]
+    hysteria="$(kokoro_cfg '.inbound.hysteria.enabled // false')"
+    [[ "$use_l4" == "true" &&
+       ( "$mode" == "both" || ( "$mode" == "reality" && "$hysteria" == "true" ) ) ]]
 }
 
 kokoro_caddy_installed_matches() {
@@ -202,4 +204,47 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable caddy >/dev/null 2>&1 || true
+}
+
+kokoro_hysteria_prepare_certificate() {
+    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
+
+    local domain cert key i mode caddy_bin caddyfile stopped_xray=false
+    domain="$(kokoro_cfg '.inbound.hysteria.domain' | tr '[:upper:]' '[:lower:]')"
+    mode="$(kokoro_cfg '.inbound.mode')"
+    caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
+    caddyfile="$(kokoro_cfg '.paths.caddyfile')"
+    install -d -m 700 /var/lib/kokoro-caddy
+    kokoro_render_caddy
+    "$caddy_bin" validate --config "$caddyfile" ||
+        kokoro_die "invalid Caddy config for Hysteria2 certificate"
+
+    if [[ "$mode" == "reality" ]] && systemctl is-active --quiet xray 2>/dev/null; then
+        systemctl stop xray
+        stopped_xray=true
+    fi
+
+    if ! systemctl restart caddy; then
+        [[ "$stopped_xray" == "true" ]] && systemctl restart xray || true
+        kokoro_die "caddy failed while requesting Hysteria2 certificate"
+    fi
+
+    kokoro_log "waiting for Let's Encrypt certificate: ${domain}"
+    for i in $(seq 1 90); do
+        cert="$(find /var/lib/kokoro-caddy/certificates -type f -path "*/${domain}/${domain}.crt" -print -quit 2>/dev/null)"
+        key="$(find /var/lib/kokoro-caddy/certificates -type f -path "*/${domain}/${domain}.key" -print -quit 2>/dev/null)"
+        if [[ -n "$cert" && -n "$key" ]] && openssl x509 -checkend 3600 -noout -in "$cert" >/dev/null 2>&1; then
+            kokoro_cfg_set_str '.paths.hysteria_cert' "$cert"
+            kokoro_cfg_set_str '.paths.hysteria_key' "$key"
+            kokoro_log "Hysteria2 certificate ready"
+            return 0
+        fi
+        sleep 2
+    done
+
+    if [[ "$stopped_xray" == "true" ]]; then
+        systemctl stop caddy || true
+        systemctl restart xray || true
+    fi
+    kokoro_die "certificate not issued; verify DNS points directly here and ports 80/tcp + 443/tcp are open"
 }
