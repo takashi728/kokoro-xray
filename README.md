@@ -7,7 +7,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Supported Modes
 
 - Edge single-node: VLESS XHTTP REALITY, TLS, or both
-- Optional Hysteria2 edge inbound with port hopping and Gecko/Salamander obfuscation
+- Optional Hysteria2 edge inbound with port hopping and Salamander obfuscation
 - Edge + exit: edge forwards traffic to an exit over WireGuard
 - TLS edge: Caddy handles ACME and HTTPS routing
 - REALITY edge: Xray serves public `:443` directly
