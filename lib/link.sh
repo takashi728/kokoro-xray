@@ -57,6 +57,97 @@ kokoro_link_hysteria_url() {
         "$auth" "$domain" "$primary_port" "$obfs" "$domain"
 }
 
+kokoro_link_hysteria_json() {
+    kokoro_ensure_state
+    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 1
+    local auth obfs domain ports primary_port interval congestion profile packet_size
+    auth="$(kokoro_sec '.inbound.hysteria.auth')"
+    obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
+    domain="$(kokoro_cfg '.inbound.hysteria.domain')"
+    ports="$(kokoro_cfg '.inbound.hysteria.ports' | tr -d '[:space:]')"
+    primary_port="${ports%%,*}"
+    primary_port="${primary_port%%-*}"
+    interval="$(kokoro_cfg '.inbound.hysteria.hop_interval')"
+    congestion="$(kokoro_cfg '.inbound.hysteria.congestion')"
+    profile="$(kokoro_cfg '.inbound.hysteria.bbr_profile')"
+    packet_size="$(kokoro_cfg '.inbound.hysteria.packet_size')"
+    [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 1
+
+    jq -n \
+        --arg auth "$auth" \
+        --arg obfs "$obfs" \
+        --arg domain "$domain" \
+        --arg port "$primary_port" \
+        --arg ports "$ports" \
+        --arg interval "$interval" \
+        --arg congestion "$congestion" \
+        --arg profile "$profile" \
+        --arg packet_size "$packet_size" \
+        '{
+          log: { loglevel: "warning" },
+          inbounds: [
+            {
+              tag: "socks-in",
+              listen: "127.0.0.1",
+              port: 10808,
+              protocol: "socks",
+              settings: { udp: true }
+            },
+            {
+              tag: "http-in",
+              listen: "127.0.0.1",
+              port: 10809,
+              protocol: "http"
+            }
+          ],
+          outbounds: [
+            {
+              tag: "kokoro-hysteria2",
+              protocol: "hysteria",
+              settings: {
+                version: 2,
+                address: $domain,
+                port: ($port | tonumber)
+              },
+              streamSettings: {
+                method: "hysteria",
+                network: "hysteria",
+                security: "tls",
+                tlsSettings: {
+                  serverName: $domain,
+                  alpn: ["h3"],
+                  fingerprint: "chrome"
+                },
+                hysteriaSettings: {
+                  version: 2,
+                  auth: $auth,
+                  udpIdleTimeout: 60
+                },
+                finalmask: {
+                  udp: [
+                    {
+                      type: "salamander",
+                      settings: {
+                        password: $obfs,
+                        packetSize: $packet_size
+                      }
+                    }
+                  ],
+                  quicParams: {
+                    congestion: $congestion,
+                    bbrProfile: $profile,
+                    udpHop: {
+                      ports: $ports,
+                      interval: $interval
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }'
+}
+
 kokoro_link_tls_json() {
     kokoro_ensure_state
     local uuid path mode cdn encryption
@@ -253,7 +344,7 @@ kokoro_link_qr() {
 }
 
 kokoro_link_show() {
-    local show_qr=false json_tls=false
+    local show_qr=false json_profile=""
     local reality_url tls_url hysteria_url
 
     while [[ $# -gt 0 ]]; do
@@ -261,11 +352,12 @@ kokoro_link_show() {
             --qr) show_qr=true; shift ;;
             --json)
                 if [[ $# -ge 2 && "${2:-}" != -* ]]; then
-                    [[ "$2" == "tls" ]] || kokoro_die "unknown JSON profile: $2 (expected tls)"
-                    json_tls=true
+                    [[ "$2" == "tls" || "$2" == "hysteria" ]] ||
+                        kokoro_die "unknown JSON profile: $2 (expected tls or hysteria)"
+                    json_profile="$2"
                     shift 2
                 else
-                    json_tls=true
+                    json_profile="tls"
                     shift
                 fi
                 ;;
@@ -276,11 +368,11 @@ kokoro-xray link — proxy share URLs
 Usage:
   kokoro-xray link
   kokoro-xray link --qr
-  kokoro-xray link --json [tls]
+  kokoro-xray link --json [tls|hysteria]
 
 Options:
-  --qr            Print terminal QR codes (requires qrencode)
-  --json [tls]    Print full Xray client JSON for kokoro-tls
+  --qr                    Print terminal QR codes (requires qrencode)
+  --json [tls|hysteria]   Print a full Xray client JSON profile
 EOF
                 return 0
                 ;;
@@ -288,10 +380,18 @@ EOF
         esac
     done
 
-    if [[ "$json_tls" == "true" ]]; then
-        kokoro_link_tls_json || kokoro_die "tls profile is unavailable for current mode"
-        return 0
-    fi
+    case "$json_profile" in
+        tls)
+            kokoro_link_tls_json ||
+                kokoro_die "tls profile is unavailable for current mode"
+            return 0
+            ;;
+        hysteria)
+            kokoro_link_hysteria_json ||
+                kokoro_die "hysteria profile is unavailable"
+            return 0
+            ;;
+    esac
 
     reality_url="$(kokoro_link_reality_url)"
     tls_url="$(kokoro_link_tls_url)"

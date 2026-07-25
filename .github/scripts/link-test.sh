@@ -80,6 +80,17 @@ hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
 [[ "$hysteria" == hysteria2://test-auth@hy2.example.com:443/\?* ]]
 [[ "$hysteria" != *":443,20000-20020"* ]]
 [[ "$hysteria" == *"sni=hy2.example.com"* ]]
+
+hysteria_json="$(kokoro_link_show --json hysteria)"
+printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].settings.port == 443' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.ports == "443,20000-20020"' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.interval == "10-20"' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "hy2.example.com"' >/dev/null
+
+if command -v xray >/dev/null 2>&1; then
+    printf '%s\n' "$hysteria_json" >"${HOME}/.kokoro-xray/client-hysteria.json"
+    xray run -test -config "${HOME}/.kokoro-xray/client-hysteria.json"
+fi
 SCRIPT
 
 rm -rf "$tmp_home"

@@ -97,6 +97,13 @@ configured UDP port with Gecko obfuscation parameters. The server still
 accepts the configured hopping range. Its domain must point directly to the
 VPS. Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
 
+Use the Xray JSON export when the client supports JSON import and should use
+the full UDP hopping range:
+
+```bash
+kokoro-xray link --json hysteria
+```
+
 TLS XHTTP JSON export for clients that support full JSON import:
 
 ```bash
@@ -116,7 +123,7 @@ client and keep that domain proxied with Cloudflare ECH enabled.
 | `exit [--keep-secrets]` | Install or update exit node |
 | `apply` | Render, validate, and reload services |
 | `pair` | Exchange edge/exit WireGuard peer info |
-| `link [--json tls]` | Print client links or TLS JSON |
+| `link [--json tls\|hysteria]` | Print client links or an Xray JSON profile |
 | `status` | Show service and config status |
 | `validate` | Validate rendered configs |
 | `geodata` | Update geo data files |
