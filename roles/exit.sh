@@ -22,11 +22,11 @@ source "${KOKORO_ROOT}/lib/network-tune.sh"
 
 kokoro_exit_install() {
     kokoro_need_root
+    kokoro_install_deps
     kokoro_ensure_state
     kokoro_cfg_set_str '.role' 'exit'
     kokoro_onboard_firewall
 
-    kokoro_install_deps
     kokoro_xray_install
 
     if [[ "$FORCE_SECRETS" == "true" ]]; then

@@ -25,6 +25,8 @@ jobs:
         run: bash .github/scripts/vless-encryption-test.sh
       - name: Run firewall tests
         run: bash .github/scripts/firewall-test.sh
+      - name: Run OS dependency tests
+        run: bash .github/scripts/os-test.sh
       - name: Run source path tests
         run: bash .github/scripts/source-path-test.sh
       - name: Live REALITY probe (github.com)

@@ -28,8 +28,9 @@ kokoro_pkg_install() {
     kokoro_need_root
     case "${KOKORO_OS_ID}" in
         debian | ubuntu)
-            apt-get update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"
+            apt-get -o DPkg::Lock::Timeout=120 update -qq
+            DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+                apt-get -o DPkg::Lock::Timeout=120 install -y -qq "$@"
             ;;
         *)
             kokoro_die "unsupported OS: ${KOKORO_OS_ID}"
@@ -38,6 +39,24 @@ kokoro_pkg_install() {
 }
 
 kokoro_install_deps() {
+    local package
+    local -a packages=(
+        ca-certificates curl git jq openssl tar unzip
+        uuid-runtime wireguard-tools ufw
+    )
+    local -a missing=()
+
     kokoro_os_supported || kokoro_die "only Debian/Ubuntu supported for now"
-    kokoro_pkg_install curl jq ca-certificates unzip wireguard-tools ufw
+    for package in "${packages[@]}"; do
+        dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+            grep -q 'ok installed' || missing+=("$package")
+    done
+
+    if [[ "${#missing[@]}" -eq 0 ]]; then
+        kokoro_log "dependencies already installed"
+        return 0
+    fi
+
+    kokoro_log "installing dependencies: ${missing[*]}"
+    kokoro_pkg_install "${missing[@]}"
 }

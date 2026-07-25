@@ -28,11 +28,11 @@ source "${KOKORO_ROOT}/lib/network-tune.sh"
 kokoro_edge_install() {
     local mode
     kokoro_need_root
+    kokoro_install_deps
     kokoro_ensure_state
     kokoro_cfg_set_str '.role' 'edge'
 
     kokoro_onboard_edge
-    kokoro_install_deps
     kokoro_xray_install
 
     if [[ "$FORCE_SECRETS" == "true" ]]; then

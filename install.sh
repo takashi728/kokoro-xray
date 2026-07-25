@@ -63,23 +63,41 @@ remove_install_dir() {
 }
 
 install_bootstrap_deps() {
-    if command -v git >/dev/null 2>&1; then
-        return 0
-    fi
+    local package
+    local -a packages=(
+        ca-certificates curl git jq openssl tar unzip
+        uuid-runtime wireguard-tools ufw
+    )
+    local -a missing=()
+
     if [[ -f /etc/os-release ]]; then
         # shellcheck disable=SC1091
         . /etc/os-release
         case "${ID:-}" in
             debian | ubuntu)
-                apt-get update -qq
-                DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl git
+                for package in "${packages[@]}"; do
+                    dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+                        grep -q 'ok installed' || missing+=("$package")
+                done
+                if [[ "${#missing[@]}" -eq 0 ]]; then
+                    log "dependencies already installed"
+                    return 0
+                fi
+
+                log "updating package index"
+                apt-get -o DPkg::Lock::Timeout=120 update -qq ||
+                    die "failed to update package index"
+                log "installing dependencies: ${missing[*]}"
+                DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+                    apt-get -o DPkg::Lock::Timeout=120 install -y -qq "${missing[@]}" ||
+                    die "failed to install required packages"
                 ;;
             *)
-                die "git required for remote install (unsupported OS: ${ID:-unknown})"
+                die "unsupported OS: ${ID:-unknown} (Debian or Ubuntu required)"
                 ;;
         esac
     else
-        die "git required for remote install"
+        die "cannot detect operating system"
     fi
 }
 
@@ -100,7 +118,6 @@ install_local() {
 }
 
 install_remote() {
-    install_bootstrap_deps
     remove_install_dir
     if [[ -n "$REPO_BRANCH" ]]; then
         git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
@@ -111,6 +128,8 @@ install_remote() {
     chmod +x "${INSTALL_DIR}/lib/"*.sh "${INSTALL_DIR}/roles/"*.sh 2>/dev/null || true
     chmod 644 "${INSTALL_DIR}/data/"*.txt 2>/dev/null || true
 }
+
+install_bootstrap_deps
 
 if [[ -z "$REPO_BRANCH" ]]; then
     if [[ "$CLEAN_INSTALL" == "true" && -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
