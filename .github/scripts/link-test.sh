@@ -80,6 +80,7 @@ hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
 [[ "$hysteria" == hysteria2://test-auth@hy2.example.com:443/\?* ]]
 [[ "$hysteria" != *":443,20000-20020"* ]]
 [[ "$hysteria" == *"sni=hy2.example.com"* ]]
+[[ "$hysteria" == *"mport=443%2C20000-20020"* ]]
 
 hysteria_json="$(kokoro_link_show --json hysteria)"
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].settings.port == 443' >/dev/null
