@@ -45,7 +45,7 @@ kokoro_link_reality_url() {
 kokoro_link_hysteria_url() {
     kokoro_ensure_state
     [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
-    local auth obfs domain ports primary_port encoded_ports
+    local auth obfs domain ports primary_port encoded_ports interval hop_interval
     auth="$(kokoro_sec '.inbound.hysteria.auth')"
     obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
     domain="$(kokoro_cfg '.inbound.hysteria.domain')"
@@ -53,9 +53,12 @@ kokoro_link_hysteria_url() {
     primary_port="${ports%%,*}"
     primary_port="${primary_port%%-*}"
     encoded_ports="$(jq -rn --arg value "$ports" '$value | @uri')"
+    interval="$(kokoro_cfg '.inbound.hysteria.hop_interval')"
+    hop_interval="${interval%%-*}"
     [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 0
-    printf 'hysteria2://%s@%s:%s/?obfs=gecko&obfs-password=%s&sni=%s&mport=%s#kokoro-hysteria2\n' \
-        "$auth" "$domain" "$primary_port" "$obfs" "$domain" "$encoded_ports"
+    printf 'hysteria2://%s@%s:%s/?obfs=gecko&obfs-password=%s&sni=%s&mport=%s&port=%s&mportHopInt=%s#kokoro-hysteria2\n' \
+        "$auth" "$domain" "$primary_port" "$obfs" "$domain" \
+        "$encoded_ports" "$encoded_ports" "$hop_interval"
 }
 
 kokoro_link_hysteria_json() {

@@ -93,10 +93,10 @@ kokoro-xray link
 ```
 
 Hysteria2 output uses a `hysteria2://` URI on the first configured UDP port
-with Gecko obfuscation parameters. The `mport` query carries the full hopping
-range for clients such as v2rayN without corrupting the hostname. Its domain
-must point directly to the VPS. Cloudflare's ordinary CDN proxy does not carry
-Hysteria2 UDP traffic.
+with Gecko obfuscation parameters. It includes the `mport` parameter used by
+v2rayN and the `port`/`mportHopInt` parameters used by Happ, without placing a
+port range in the hostname. Its domain must point directly to the VPS.
+Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
 
 Use the Xray JSON export when the client supports JSON import and should use
 the full UDP hopping range:
