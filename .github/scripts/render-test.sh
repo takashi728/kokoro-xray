@@ -12,6 +12,7 @@ jq -n -f "${ROOT}/lib/render.jq" \
     --slurpfile sec "${FIX}/edge-secrets.json" \
     >"${OUT}/edge-xray.json"
 jq -e '.inbounds | length == 2' "${OUT}/edge-xray.json" >/dev/null
+jq -e '[.inbounds[] | select(.protocol == "hysteria")] | length == 0' "${OUT}/edge-xray.json" >/dev/null
 jq -e '(.outbounds | map(.tag) | index("TOR")) | not' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.outbounds | map(.tag) | index("WG_TO_EXIT")' "${OUT}/edge-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "WG_TO_EXIT"' "${OUT}/edge-xray.json" >/dev/null

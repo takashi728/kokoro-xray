@@ -25,14 +25,22 @@ kokoro_migrate() {
 
     ver="$(kokoro_cfg '.version')"
     if [[ "$ver" == "0.3.0" ]]; then
-        kokoro_cfg_set '.inbound.hysteria.enabled' 'false'
         if [[ "$(kokoro_cfg '.caddy.version')" == "2.9.1" ]]; then
             kokoro_cfg_set_str '.caddy.version' '2.11.3'
         fi
         kokoro_cfg_set_str '.version' '0.4.0'
         kokoro_sec_set_str '.version' '0.4.0'
-        kokoro_log "migrated config 0.3.0 → 0.4.0 (Hysteria2 disabled)"
+        kokoro_log "migrated config 0.3.0 → 0.4.0"
     fi
+
+    ver="$(kokoro_cfg '.version')"
+    if [[ "$ver" == "0.4.0" ]]; then
+        kokoro_cfg_set_str '.version' '0.5.0'
+        kokoro_sec_set_str '.version' '0.5.0'
+        kokoro_log "migrated config 0.4.0 → 0.5.0"
+    fi
+
+    kokoro_migrate_remove_retired_features
 
     if ! jq -e '.firewall' "${KOKORO_CONFIG}" >/dev/null 2>&1; then
         tmp="$(mktemp)"
@@ -40,6 +48,26 @@ kokoro_migrate() {
             "${KOKORO_CONFIG}" >"$tmp"
         mv "$tmp" "${KOKORO_CONFIG}"
     fi
+}
+
+kokoro_migrate_remove_retired_features() {
+    local tmp
+
+    tmp="$(mktemp)"
+    jq 'del(
+          .inbound.hysteria,
+          .multinode.finalmask,
+          .paths.hysteria_cert,
+          .paths.hysteria_key
+        )' \
+        "${KOKORO_CONFIG}" >"$tmp"
+    mv "$tmp" "${KOKORO_CONFIG}"
+    chmod 644 "${KOKORO_CONFIG}"
+
+    tmp="$(mktemp)"
+    jq 'del(.inbound.hysteria)' "${KOKORO_SECRETS}" >"$tmp"
+    mv "$tmp" "${KOKORO_SECRETS}"
+    chmod 600 "${KOKORO_SECRETS}"
 }
 
 kokoro_migrate_merge_defaults() {

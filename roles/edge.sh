@@ -50,13 +50,10 @@ kokoro_edge_install() {
             kokoro_log "keeping existing secrets"
         fi
     fi
-    kokoro_ensure_hysteria_secrets
-
     mode="$(kokoro_cfg '.inbound.mode')"
     if kokoro_caddy_required; then
         kokoro_caddy_install
         [[ "$mode" == "tls" || "$mode" == "both" ]] && kokoro_cf_dns01_hint
-        kokoro_hysteria_prepare_certificate
     fi
 
     if [[ -t 0 && "$(kokoro_cfg '.multinode.enabled')" != "true" ]]; then

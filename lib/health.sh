@@ -23,11 +23,6 @@ kokoro_health() {
         local mode
         mode="$(kokoro_cfg '.inbound.mode')"
         echo "vless enc: $(kokoro_cfg '.inbound.vless_encryption.enabled // false')"
-        echo "hysteria:  $(kokoro_cfg '.inbound.hysteria.enabled // false')"
-        if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
-            echo "hy2 domain: $(kokoro_cfg '.inbound.hysteria.domain')"
-            echo "hy2 ports:  $(kokoro_cfg '.inbound.hysteria.ports')/udp"
-        fi
         if kokoro_caddy_required; then
             echo "caddy:    $(systemctl is-active caddy 2>/dev/null || echo unknown)"
         fi

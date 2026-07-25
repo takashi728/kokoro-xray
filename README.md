@@ -7,7 +7,6 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Supported Modes
 
 - Edge single-node: VLESS XHTTP REALITY, TLS, or both
-- Optional Hysteria2 edge inbound with port hopping and Salamander obfuscation
 - Edge + exit: edge forwards traffic to an exit over WireGuard
 - TLS edge: Caddy handles ACME and HTTPS routing
 - REALITY edge: Xray serves public `:443` directly
@@ -18,10 +17,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 - Root access
 - `443/tcp` open on edge nodes
 - `80/tcp` open on TLS edge nodes for ACME
-- Hysteria2 UDP ports open when enabled, default `443,20000-20020/udp`
-- A direct, DNS-only domain for Hysteria2 certificate issuance
 - Exit node UDP port open when using edge + exit, default `51820/udp`
-- Xray-core `v26.7.11` or newer for Hysteria2
 
 ## Install
 
@@ -92,19 +88,6 @@ Standard share links:
 kokoro-xray link
 ```
 
-Hysteria2 output uses a `hysteria2://` URI on the first configured UDP port
-with standard Salamander obfuscation. It includes the `mport` parameter used by
-v2rayN and the `port`/`mportHopInt` parameters used by Happ, without placing a
-port range in the hostname. Its domain must point directly to the VPS.
-Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
-
-Use the Xray JSON export when the client supports JSON import and should use
-the full UDP hopping range:
-
-```bash
-kokoro-xray link --json hysteria
-```
-
 TLS XHTTP JSON export for clients that support full JSON import:
 
 ```bash
@@ -112,9 +95,6 @@ kokoro-xray link --json tls
 ```
 
 Use JSON export for TLS mode when the client app does not preserve advanced XHTTP settings from URL subscriptions.
-The JSON profile also requires ECH for the configured Cloudflare CDN domain,
-obtaining its ECH configuration through Cloudflare DoH. Use a current Xray
-client and keep that domain proxied with Cloudflare ECH enabled.
 
 ## Commands
 
@@ -124,7 +104,7 @@ client and keep that domain proxied with Cloudflare ECH enabled.
 | `exit [--keep-secrets]` | Install or update exit node |
 | `apply` | Render, validate, and reload services |
 | `pair` | Exchange edge/exit WireGuard peer info |
-| `link [--json tls\|hysteria]` | Print client links or an Xray JSON profile |
+| `link [--json tls]` | Print client links or the Xray TLS JSON profile |
 | `status` | Show service and config status |
 | `validate` | Validate rendered configs |
 | `geodata` | Update geo data files |
@@ -154,20 +134,6 @@ Enabling or disabling changes every client profile. Refresh links afterward.
 The VLESS layer protects payloads inside XHTTP; TLS or REALITY remains required
 for transport security and censorship resistance.
 
-## Hysteria2
-
-Run `sudo kokoro-xray edge` and enable Hysteria2 during onboarding. It runs in
-parallel with the selected VLESS mode and defaults to:
-
-- Real Let's Encrypt certificate managed by Caddy
-- UDP port hopping across `443,20000-20020`
-- Gecko, which wraps Salamander and fragments QUIC handshake packets
-- BBR with the aggressive profile
-- HTTP/3 masquerade proxying to the selected public website
-
-Caddy disables its own HTTP/3 listener while Hysteria2 is enabled so Xray alone
-owns UDP `443`. Hysteria Realm/NAT-to-NAT mode is intentionally not configured.
-
 ## REALITY Target Scan
 
 ```bash
@@ -187,7 +153,6 @@ The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect b
 - Secrets: `~/.kokoro-xray/secrets.json`
 - Xray config: `/usr/local/etc/xray/config.json`
 - Caddyfile: `/etc/caddy/Caddyfile`
-- Hysteria2 certificates: `/var/lib/kokoro-caddy/certificates/`
 
 ## Notes
 

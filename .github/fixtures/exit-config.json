@@ -1,13 +1,12 @@
 {
-  "version": "0.3.0",
+  "version": "0.5.0",
   "role": "exit",
   "inbound": { "mode": "reality" },
   "multinode": {
     "enabled": false,
     "exit_port": 51820,
     "peer_edge_pubkey": "bG36yWo3zQ9rS4tU6vX8yZ0aB2cD4eF6gH8iK0lM2nO=",
-    "peer_wg_ip": "10.66.0.2",
-    "finalmask": true
+    "peer_wg_ip": "10.66.0.2"
   },
   "tor": { "enabled": true, "socks_port": 9050 },
   "routing": {},

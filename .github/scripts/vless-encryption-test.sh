@@ -38,20 +38,32 @@ kokoro_gen_vless_encryption_keys
 SCRIPT
 echo "key_parse OK"
 
-jq '.version = "0.2.0" | del(.inbound.vless_encryption)' \
+jq '.version = "0.2.0"
+    | del(.inbound.vless_encryption)
+    | .inbound.hysteria = {"enabled":true}
+    | .multinode.finalmask = true
+    | .paths.hysteria_cert = "/old/cert"
+    | .paths.hysteria_key = "/old/key"' \
     "${ROOT}/config.defaults.json" >"${state}/config.json"
-jq '.version = "0.2.0" | .inbound.uuid = "preserve-me" | del(.inbound.vless_encryption)' \
+jq '.version = "0.2.0"
+    | .inbound.uuid = "preserve-me"
+    | del(.inbound.vless_encryption)
+    | .inbound.hysteria = {"auth":"old","obfs_password":"old"}' \
     "${ROOT}/secrets.defaults.json" >"${state}/secrets.json"
 
 HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
 set -euo pipefail
 source "${KOKORO_ROOT}/lib/common.sh"
 kokoro_ensure_state
-[[ "$(kokoro_cfg '.version')" == "0.3.0" ]]
-[[ "$(kokoro_sec '.version')" == "0.3.0" ]]
+[[ "$(kokoro_cfg '.version')" == "0.5.0" ]]
+[[ "$(kokoro_sec '.version')" == "0.5.0" ]]
 [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled')" == "false" ]]
 [[ "$(kokoro_sec '.inbound.uuid')" == "preserve-me" ]]
 [[ -z "$(kokoro_sec '.inbound.vless_encryption.decryption')" ]]
+[[ "$(kokoro_cfg 'has("inbound") and (.inbound | has("hysteria") | not)')" == "true" ]]
+[[ "$(kokoro_cfg '.multinode | has("finalmask")')" == "false" ]]
+[[ "$(kokoro_cfg '.paths | has("hysteria_cert") or has("hysteria_key")')" == "false" ]]
+[[ "$(kokoro_sec '.inbound | has("hysteria")')" == "false" ]]
 SCRIPT
 echo "migration_safe_default OK"
 

@@ -38,7 +38,7 @@ printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.security == "tls
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "cdn.example.com"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.fingerprint == "chrome"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.alpn[0] == "h2"' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.echConfigList == "https://cloudflare-dns.com/dns-query"' >/dev/null
+printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings | has("echConfigList") | not' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.mode == "auto"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
@@ -71,35 +71,6 @@ kokoro_cfg_set '.inbound.vless_encryption.enabled' 'false'
 disabled_tls="$(kokoro_link_tls_url | tr -d '\n')"
 [[ "$disabled_tls" == *"encryption=none"* ]]
 
-kokoro_cfg_set '.inbound.hysteria.enabled' 'true'
-kokoro_cfg_set_str '.inbound.hysteria.domain' 'hy2.example.com'
-kokoro_cfg_set_str '.inbound.hysteria.ports' '443,20000-20020'
-kokoro_sec_set_str '.inbound.hysteria.auth' 'test-auth'
-kokoro_sec_set_str '.inbound.hysteria.obfs_password' 'test-obfs'
-hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
-[[ "$hysteria" == hysteria2://test-auth@hy2.example.com:443/\?* ]]
-[[ "$hysteria" != *":443,20000-20020"* ]]
-[[ "$hysteria" == *"obfs=salamander"* ]]
-[[ "$hysteria" != *"obfs=gecko"* ]]
-[[ "$hysteria" == *"sni=hy2.example.com"* ]]
-[[ "$hysteria" == *"mport=443%2C20000-20020"* ]]
-[[ "$hysteria" == *"&port=443%2C20000-20020"* ]]
-[[ "$hysteria" == *"&mportHopInt=10"* ]]
-
-hysteria_json="$(kokoro_link_show --json hysteria)"
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].settings.port == 443' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.ports == "443,20000-20020"' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.interval == "10-20"' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "hy2.example.com"' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '
-    .outbounds[0].streamSettings.finalmask.udp[0].type == "salamander"
-    and (.outbounds[0].streamSettings.finalmask.udp[0].settings | has("packetSize") | not)
-' >/dev/null
-
-if command -v xray >/dev/null 2>&1; then
-    printf '%s\n' "$hysteria_json" >"${HOME}/.kokoro-xray/client-hysteria.json"
-    xray run -test -config "${HOME}/.kokoro-xray/client-hysteria.json"
-fi
 SCRIPT
 
 rm -rf "$tmp_home"

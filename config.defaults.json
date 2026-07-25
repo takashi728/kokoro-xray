@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "language": "auto",
   "role": "",
   "inbound": {
@@ -15,16 +15,6 @@
       "domain": "",
       "cdn_domain": "",
       "acme_email": ""
-    },
-    "hysteria": {
-      "enabled": false,
-      "domain": "",
-      "acme_email": "",
-      "ports": "443,20000-20020",
-      "hop_interval": "10-20",
-      "masquerade": "www.cloudflare.com",
-      "congestion": "bbr",
-      "bbr_profile": "aggressive"
     }
   },
   "caddy": {
@@ -53,8 +43,6 @@
   "paths": {
     "xray_config": "/usr/local/etc/xray/config.json",
     "caddyfile": "/etc/caddy/Caddyfile",
-    "hysteria_cert": "",
-    "hysteria_key": "",
     "xray_bin": "/usr/local/bin/xray",
     "caddy_bin": "/usr/local/bin/caddy",
     "geo_dir": "/usr/local/share/xray"

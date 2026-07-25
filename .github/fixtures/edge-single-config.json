@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.5.0",
   "language": "en",
   "role": "edge",
   "inbound": {
@@ -28,8 +28,7 @@
     "peer_exit_pubkey": "",
     "peer_edge_pubkey": "",
     "local_wg_ip": "10.66.0.2",
-    "peer_wg_ip": "10.66.0.1",
-    "finalmask": true
+    "peer_wg_ip": "10.66.0.1"
   },
   "tor": {
     "enabled": false,
