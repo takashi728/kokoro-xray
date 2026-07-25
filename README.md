@@ -92,9 +92,10 @@ Standard share links:
 kokoro-xray link
 ```
 
-Hysteria2 output uses the official `hysteria2://` URI with port hopping and
-Gecko obfuscation parameters. Its domain must point directly to the VPS.
-Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
+Hysteria2 output uses a broadly compatible `hysteria2://` URI on the first
+configured UDP port with Gecko obfuscation parameters. The server still
+accepts the configured hopping range. Its domain must point directly to the
+VPS. Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
 
 TLS XHTTP JSON export for clients that support full JSON import:
 

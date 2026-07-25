@@ -11,6 +11,7 @@ cp "${FIX}/edge-secrets.json" "${tmp_home}/.kokoro-xray/secrets.json"
 HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
 set -euo pipefail
 source "${KOKORO_ROOT}/lib/link.sh"
+kokoro_ensure_state >/dev/null
 
 expected_pbk="$(kokoro_sec '.inbound.reality.public_key')"
 expected_encryption="$(kokoro_sec '.inbound.vless_encryption.encryption')"
@@ -69,6 +70,16 @@ fi
 kokoro_cfg_set '.inbound.vless_encryption.enabled' 'false'
 disabled_tls="$(kokoro_link_tls_url | tr -d '\n')"
 [[ "$disabled_tls" == *"encryption=none"* ]]
+
+kokoro_cfg_set '.inbound.hysteria.enabled' 'true'
+kokoro_cfg_set_str '.inbound.hysteria.domain' 'hy2.example.com'
+kokoro_cfg_set_str '.inbound.hysteria.ports' '443,20000-20020'
+kokoro_sec_set_str '.inbound.hysteria.auth' 'test-auth'
+kokoro_sec_set_str '.inbound.hysteria.obfs_password' 'test-obfs'
+hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
+[[ "$hysteria" == hysteria2://test-auth@hy2.example.com:443/\?* ]]
+[[ "$hysteria" != *":443,20000-20020"* ]]
+[[ "$hysteria" == *"sni=hy2.example.com"* ]]
 SCRIPT
 
 rm -rf "$tmp_home"

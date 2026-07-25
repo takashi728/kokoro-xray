@@ -45,14 +45,16 @@ kokoro_link_reality_url() {
 kokoro_link_hysteria_url() {
     kokoro_ensure_state
     [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
-    local auth obfs domain ports
+    local auth obfs domain ports primary_port
     auth="$(kokoro_sec '.inbound.hysteria.auth')"
     obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
     domain="$(kokoro_cfg '.inbound.hysteria.domain')"
     ports="$(kokoro_cfg '.inbound.hysteria.ports' | tr -d '[:space:]')"
+    primary_port="${ports%%,*}"
+    primary_port="${primary_port%%-*}"
     [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 0
     printf 'hysteria2://%s@%s:%s/?obfs=gecko&obfs-password=%s&sni=%s#kokoro-hysteria2\n' \
-        "$auth" "$domain" "$ports" "$obfs" "$domain"
+        "$auth" "$domain" "$primary_port" "$obfs" "$domain"
 }
 
 kokoro_link_tls_json() {
