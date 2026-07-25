@@ -5,6 +5,7 @@ set -euo pipefail
 
 REPO_URL="${KOKORO_REPO_URL:-https://github.com/takashi728/kokoro-xray}"
 REPO_BRANCH="${KOKORO_REPO_BRANCH:-}"
+DEFAULT_REPO_BRANCH="${KOKORO_DEFAULT_REPO_BRANCH:-feature/upstream-hardening-vless-encryption}"
 INSTALL_DIR="${KOKORO_INSTALL_DIR:-/opt/kokoro-xray}"
 CLEAN_INSTALL=false
 INSTALL_ARGS=()
@@ -110,6 +111,15 @@ install_remote() {
     chmod +x "${INSTALL_DIR}/lib/"*.sh "${INSTALL_DIR}/roles/"*.sh 2>/dev/null || true
     chmod 644 "${INSTALL_DIR}/data/"*.txt 2>/dev/null || true
 }
+
+if [[ -z "$REPO_BRANCH" ]]; then
+    if [[ "$CLEAN_INSTALL" == "true" && -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
+        REPO_BRANCH="$(git -C "$SCRIPT_DIR" branch --show-current 2>/dev/null || true)"
+        REPO_BRANCH="${REPO_BRANCH:-$DEFAULT_REPO_BRANCH}"
+    elif [[ ! -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
+        REPO_BRANCH="$DEFAULT_REPO_BRANCH"
+    fi
+fi
 
 if [[ -n "$REPO_BRANCH" ]]; then
     install_remote
