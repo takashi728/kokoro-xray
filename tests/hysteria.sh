@@ -41,7 +41,8 @@ jq -e '
     and .port == "443,20000-20020"
     and .streamSettings.method == "hysteria"
     and .streamSettings.finalmask.quicParams.bbrProfile == "aggressive"
-    and .streamSettings.finalmask.udp[0].settings.packetSize == "512-1200")
+    and .streamSettings.finalmask.udp[0].type == "salamander"
+    and (.streamSettings.finalmask.udp[0].settings | has("packetSize") | not))
   and any(.inbounds[]; .tag == "REALITY_XHTTP_IN" and .listen == "127.0.0.1" and .port == 8443)
 ' "$TMP/xray.json" >/dev/null
 grep -q 'protocols h1 h2' "$TMP/Caddyfile"

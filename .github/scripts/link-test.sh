@@ -79,6 +79,8 @@ kokoro_sec_set_str '.inbound.hysteria.obfs_password' 'test-obfs'
 hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
 [[ "$hysteria" == hysteria2://test-auth@hy2.example.com:443/\?* ]]
 [[ "$hysteria" != *":443,20000-20020"* ]]
+[[ "$hysteria" == *"obfs=salamander"* ]]
+[[ "$hysteria" != *"obfs=gecko"* ]]
 [[ "$hysteria" == *"sni=hy2.example.com"* ]]
 [[ "$hysteria" == *"mport=443%2C20000-20020"* ]]
 [[ "$hysteria" == *"&port=443%2C20000-20020"* ]]
@@ -89,6 +91,10 @@ printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].settings.port == 443' >/de
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.ports == "443,20000-20020"' >/dev/null
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.interval == "10-20"' >/dev/null
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "hy2.example.com"' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '
+    .outbounds[0].streamSettings.finalmask.udp[0].type == "salamander"
+    and (.outbounds[0].streamSettings.finalmask.udp[0].settings | has("packetSize") | not)
+' >/dev/null
 
 if command -v xray >/dev/null 2>&1; then
     printf '%s\n' "$hysteria_json" >"${HOME}/.kokoro-xray/client-hysteria.json"

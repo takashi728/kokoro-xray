@@ -93,7 +93,7 @@ kokoro-xray link
 ```
 
 Hysteria2 output uses a `hysteria2://` URI on the first configured UDP port
-with Gecko obfuscation parameters. It includes the `mport` parameter used by
+with standard Salamander obfuscation. It includes the `mport` parameter used by
 v2rayN and the `port`/`mportHopInt` parameters used by Happ, without placing a
 port range in the hostname. Its domain must point directly to the VPS.
 Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.

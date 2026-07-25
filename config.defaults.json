@@ -24,8 +24,7 @@
       "hop_interval": "10-20",
       "masquerade": "www.cloudflare.com",
       "congestion": "bbr",
-      "bbr_profile": "aggressive",
-      "packet_size": "512-1200"
+      "bbr_profile": "aggressive"
     }
   },
   "caddy": {

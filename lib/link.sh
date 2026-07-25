@@ -56,7 +56,7 @@ kokoro_link_hysteria_url() {
     interval="$(kokoro_cfg '.inbound.hysteria.hop_interval')"
     hop_interval="${interval%%-*}"
     [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 0
-    printf 'hysteria2://%s@%s:%s/?obfs=gecko&obfs-password=%s&sni=%s&mport=%s&port=%s&mportHopInt=%s#kokoro-hysteria2\n' \
+    printf 'hysteria2://%s@%s:%s/?obfs=salamander&obfs-password=%s&sni=%s&mport=%s&port=%s&mportHopInt=%s#kokoro-hysteria2\n' \
         "$auth" "$domain" "$primary_port" "$obfs" "$domain" \
         "$encoded_ports" "$encoded_ports" "$hop_interval"
 }
@@ -64,7 +64,7 @@ kokoro_link_hysteria_url() {
 kokoro_link_hysteria_json() {
     kokoro_ensure_state
     [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 1
-    local auth obfs domain ports primary_port interval congestion profile packet_size
+    local auth obfs domain ports primary_port interval congestion profile
     auth="$(kokoro_sec '.inbound.hysteria.auth')"
     obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
     domain="$(kokoro_cfg '.inbound.hysteria.domain')"
@@ -74,7 +74,6 @@ kokoro_link_hysteria_json() {
     interval="$(kokoro_cfg '.inbound.hysteria.hop_interval')"
     congestion="$(kokoro_cfg '.inbound.hysteria.congestion')"
     profile="$(kokoro_cfg '.inbound.hysteria.bbr_profile')"
-    packet_size="$(kokoro_cfg '.inbound.hysteria.packet_size')"
     [[ -n "$auth" && -n "$obfs" && -n "$domain" ]] || return 1
 
     jq -n \
@@ -86,7 +85,6 @@ kokoro_link_hysteria_json() {
         --arg interval "$interval" \
         --arg congestion "$congestion" \
         --arg profile "$profile" \
-        --arg packet_size "$packet_size" \
         '{
           log: { loglevel: "warning" },
           inbounds: [
@@ -132,8 +130,7 @@ kokoro_link_hysteria_json() {
                     {
                       type: "salamander",
                       settings: {
-                        password: $obfs,
-                        packetSize: $packet_size
+                        password: $obfs
                       }
                     }
                   ],

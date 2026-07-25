@@ -117,8 +117,7 @@ def hysteria_inbound: {
       udp: [{
         type: "salamander",
         settings: {
-          password: sec.inbound.hysteria.obfs_password,
-          packetSize: cfg.inbound.hysteria.packet_size
+          password: sec.inbound.hysteria.obfs_password
         }
       }],
       quicParams: {
