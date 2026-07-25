@@ -96,6 +96,9 @@ kokoro-xray link --json tls
 ```
 
 Use JSON export for TLS mode when the client app does not preserve advanced XHTTP settings from URL subscriptions.
+The JSON profile also requires ECH for the configured Cloudflare CDN domain,
+obtaining its ECH configuration through Cloudflare DoH. Use a current Xray
+client and keep that domain proxied with Cloudflare ECH enabled.
 
 ## Commands
 

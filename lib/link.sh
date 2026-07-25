@@ -104,7 +104,8 @@ kokoro_link_tls_json() {
                 tlsSettings: {
                   serverName: $cdn,
                   fingerprint: "chrome",
-                  alpn: ["h2"]
+                  alpn: ["h2"],
+                  echConfigList: "https://cloudflare-dns.com/dns-query"
                 },
                 xhttpSettings: {
                   path: $path,
