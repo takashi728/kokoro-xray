@@ -26,19 +26,22 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/upstream-hardening-vless-encryption/install.sh \
+  | sudo bash -s -- --branch feature/upstream-hardening-vless-encryption
 ```
 
 Install and immediately start edge setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --edge
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/upstream-hardening-vless-encryption/install.sh \
+  | sudo bash -s -- --branch feature/upstream-hardening-vless-encryption --edge
 ```
 
 Install and immediately start exit setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash -s -- --exit
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/upstream-hardening-vless-encryption/install.sh \
+  | sudo bash -s -- --branch feature/upstream-hardening-vless-encryption --exit
 ```
 
 ## Update
@@ -46,14 +49,15 @@ curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install
 Normal update keeps existing state:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/feature/upstream-hardening-vless-encryption/install.sh \
+  | sudo bash -s -- --branch feature/upstream-hardening-vless-encryption
 sudo kokoro-xray apply
 ```
 
 Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 
 ```bash
-sudo kokoro-xray reinstall --branch main
+sudo kokoro-xray reinstall --branch feature/upstream-hardening-vless-encryption
 sudo kokoro-xray apply
 ```
 
@@ -125,7 +129,7 @@ client and keep that domain proxied with Cloudflare ECH enabled.
 | `reality scan` | Probe REALITY targets |
 | `vless-encryption on\|off\|status` | Manage VLESS payload encryption |
 | `tor on\|off` | Optional exit-node Tor routing |
-| `reinstall --branch main` | Clean reinstall code, keep state |
+| `reinstall --branch feature/upstream-hardening-vless-encryption` | Clean reinstall code, keep state |
 
 ## VLESS Encryption
 
