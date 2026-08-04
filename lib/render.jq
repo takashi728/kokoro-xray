@@ -24,7 +24,7 @@ def xhttp_base_settings: { path: sec.inbound.xhttp_path };
 def xhttp_tls_settings: xhttp_base_settings + {
   mode: "auto",
   xmux: {
-    maxConnections: "6",
+    maxConcurrency: "5-10",
     hMaxRequestTimes: "600-900",
     hMaxReusableSecs: "1800-3000"
   },

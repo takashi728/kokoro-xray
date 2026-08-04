@@ -42,8 +42,7 @@ printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings | ha
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.mode == "auto"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConnections == "6"' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConcurrency == null' >/dev/null
+printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConcurrency == "5-10"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.dns.servers == ["https://cloudflare-dns.com/dns-query"]' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.dns.queryStrategy == "UseIP"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[0].outboundTag == "BLOCK"' >/dev/null
