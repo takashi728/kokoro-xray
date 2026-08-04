@@ -161,6 +161,7 @@ The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect b
 - Caddy builds are pinned and rebuilt only when needed.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
 - UFW defaults to deny incoming and allow outgoing when firewall support is enabled.
+- XMUX uses `maxConcurrency: "5-10"` for throughput. Xray-core v26.6.27+ changed the default to `maxConnections: 6` (anti-RKN), but that limits the HTTP/2 connection pool and bottlenecks large downloads. `maxConcurrency: "5-10"` allows multiplexing within connections while keeping randomized values to avoid fingerprinting.
 
 ## License
 
