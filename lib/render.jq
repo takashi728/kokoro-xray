@@ -11,6 +11,8 @@ def vless_decryption:
   else "none"
   end;
 
+def static_proxy_enabled: cfg.static_proxy.enabled // false;
+
 def log_block: { log: { loglevel: "warning" } };
 
 def policy_block: {
@@ -109,24 +111,43 @@ def wg_outbound: if cfg.multinode.enabled then
   }]
 else [] end;
 
+def static_proxy_outbound: if static_proxy_enabled then
+  [{
+    tag: "STATIC_PROXY",
+    protocol: (if (cfg.static_proxy.protocol // "socks") == "http" then "http" else "socks" end),
+    settings: {
+      servers: [{
+        address: cfg.static_proxy.address,
+        port: cfg.static_proxy.port
+      } + (if (sec.static_proxy.username // "") != "" then
+            { users: [{ user: sec.static_proxy.username, pass: sec.static_proxy.password }] }
+          else {} end)]
+    }
+  }]
+else [] end;
+
+def default_egress: if static_proxy_enabled then "STATIC_PROXY" else "DIRECT" end;
+
 # Single-node: allow Google (incl. .cn) before CN/RU blocks
-def google_direct_rules: [
-  {
-    type: "field",
-    domain: [
-      "geosite:google",
-      "geosite:youtube",
-      "domain:gmail.com",
-      "domain:gemini.google.com",
-      "domain:gemini.google",
-      "domain:googleapis.cn",
-      "domain:googleapis-cn.com",
-      "domain:gstatic.cn",
-      "domain:gstatic-cn.com"
-    ],
-    outboundTag: "DIRECT"
-  }
-];
+def google_direct_rules: if static_proxy_enabled then [] else
+  [
+    {
+      type: "field",
+      domain: [
+        "geosite:google",
+        "geosite:youtube",
+        "domain:gmail.com",
+        "domain:gemini.google.com",
+        "domain:gemini.google",
+        "domain:googleapis.cn",
+        "domain:googleapis-cn.com",
+        "domain:gstatic.cn",
+        "domain:gstatic-cn.com"
+      ],
+      outboundTag: "DIRECT"
+    }
+  ]
+end;
 
 def single_node_block_rules: [
   { type: "field", ip: ["geoip:private"], outboundTag: "BLOCK" },
@@ -153,7 +174,7 @@ else [] end;
 def edge_single_routing: {
   domainStrategy: "IPIfNonMatch",
   rules: (google_direct_rules + single_node_block_rules + [
-    { type: "field", network: "tcp,udp", outboundTag: "DIRECT" }
+    { type: "field", network: "tcp,udp", outboundTag: default_egress }
   ])
 };
 
@@ -172,7 +193,7 @@ def edge_inbounds:
 
 def edge_config: log_block + {
   inbounds: edge_inbounds,
-  outbounds: (base_outbounds + wg_outbound),
+  outbounds: (base_outbounds + static_proxy_outbound + wg_outbound),
   routing: edge_routing,
   policy: policy_block.policy
 };

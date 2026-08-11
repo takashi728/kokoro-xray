@@ -63,7 +63,35 @@ kokoro_onboard_edge() {
     fi
 
     kokoro_cfg_set '.tor.enabled' 'false'
+    kokoro_onboard_static_proxy
     kokoro_onboard_firewall
+}
+
+kokoro_onboard_static_proxy() {
+    local ans proto addr port user pass
+    if [[ ! -t 0 ]]; then
+        return 0
+    fi
+
+    read -r -p "Do you have a static proxy? [y/N]: " ans
+    if [[ ! "$ans" =~ ^[Yy]$ ]]; then
+        kokoro_cfg_set '.static_proxy.enabled' 'false'
+        return 0
+    fi
+
+    kokoro_cfg_set '.static_proxy.enabled' 'true'
+    read -r -p "Static proxy protocol [socks/http] (socks): " proto
+    kokoro_cfg_set_str '.static_proxy.protocol' "${proto:-socks}"
+    read -r -p "Static proxy address: " addr
+    [[ -n "$addr" ]] && kokoro_cfg_set_str '.static_proxy.address' "$addr"
+    read -r -p "Static proxy port: " port
+    [[ -n "$port" ]] && kokoro_cfg_set '.static_proxy.port' "$port"
+    read -r -p "Static proxy username (empty = none): " user
+    if [[ -n "$user" ]]; then
+        kokoro_sec_set_str '.static_proxy.username' "$user"
+        read -r -s -p "Static proxy password: " pass && echo
+        kokoro_sec_set_str '.static_proxy.password' "${pass:-}"
+    fi
 }
 
 kokoro_onboard_firewall() {

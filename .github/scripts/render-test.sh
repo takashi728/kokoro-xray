@@ -47,6 +47,22 @@ jq -n -f "${ROOT}/lib/render.jq" \
     >"${OUT}/edge-disabled-xray.json"
 jq -e '.inbounds[0].settings.decryption == "none"' "${OUT}/edge-disabled-xray.json" >/dev/null
 
+echo "== edge single-node xray with static proxy =="
+jq '.static_proxy = {enabled: true, protocol: "socks", address: "203.0.113.10", port: 1080}' \
+    "${FIX}/edge-single-config.json" >"${OUT}/edge-sp-config.json"
+jq '.static_proxy = {username: "user1", password: "pass1"}' \
+    "${FIX}/edge-secrets.json" >"${OUT}/edge-sp-secrets.json"
+jq -n -f "${ROOT}/lib/render.jq" \
+    --slurpfile cfg "${OUT}/edge-sp-config.json" \
+    --slurpfile sec "${OUT}/edge-sp-secrets.json" \
+    >"${OUT}/edge-sp-xray.json"
+jq -e '.outbounds | map(.tag) | index("STATIC_PROXY")' "${OUT}/edge-sp-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="STATIC_PROXY") | .protocol == "socks"' "${OUT}/edge-sp-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="STATIC_PROXY") | .settings.servers[0].address == "203.0.113.10"' "${OUT}/edge-sp-xray.json" >/dev/null
+jq -e '.outbounds[] | select(.tag=="STATIC_PROXY") | .settings.servers[0].users[0].user == "user1"' "${OUT}/edge-sp-xray.json" >/dev/null
+jq -e '.routing.rules[-1].outboundTag == "STATIC_PROXY"' "${OUT}/edge-sp-xray.json" >/dev/null
+jq -e '.routing.rules | map(select(.domain[]? == "geosite:google")) | length == 0' "${OUT}/edge-sp-xray.json" >/dev/null
+
 echo "== edge caddy =="
 jq -n -r -f "${ROOT}/lib/caddy.jq" \
     --slurpfile cfg "${FIX}/edge-config.json" \
