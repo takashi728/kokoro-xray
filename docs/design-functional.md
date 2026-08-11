@@ -91,3 +91,18 @@ the deep modules, adapters only translate.
    `kokoro_cfg`-inside-every-module pattern; re-run `render-test` + friends.
 
 Phase 1 is the big win (process count + testability); 2 and 3 are cleanup.
+
+## Low-spec VPS build patch (Phase 2/3 scope)
+
+Caddy's Go compile OOMs on 1–3 GB, single-core Intel VPSes. Handled as a pure,
+testable module in `lib/caddy.sh`:
+
+- `kokoro_build_tuning(cpus, mem_mb)` → env: `GOFLAGS=-p=1` (cpus≤2),
+  `GOGC=25/50` + `GOMEMLIMIT=75%` (mem≤6GB) so the build fits in RAM.
+- `kokoro_build_env()` detects `nproc`/`/proc/meminfo`, exports the tuning, and
+  warns when ≤2GB with no swap.
+- `kokoro_run_cmd(label, ...)` is the Phase 2 seam: real build uses
+  `kokoro_run_with_timer`, tests inject `KOKORO_RUNNER` fake.
+
+Fast single-core Ryzen boxes get the same `-p=1` but rarely need the memory
+limits; big multi-core hosts build unrestricted.

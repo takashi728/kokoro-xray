@@ -61,6 +61,54 @@ kokoro_run_with_timer() {
     return "$status"
 }
 
+# Phase 2: seam for external build commands. Tests set KOKORO_RUNNER to a fake.
+kokoro_run_cmd() { # label cmd...
+    local label="$1"
+    shift
+    if [[ -n "${KOKORO_RUNNER:-}" ]]; then
+        "${KOKORO_RUNNER}" "$label" "$@"
+    else
+        kokoro_run_with_timer "$label" "$@"
+    fi
+}
+
+# Pure: given cpus/mem_mb, emit Go build env assignments that keep the Caddy
+# compile inside memory on small VPSes (1-3GB, single core, slow Intel).
+#   cpus<=2          -> build one package at a time (GOFLAGS=-p=1)
+#   mem<=3GB         -> GOGC=25 + GOMEMLIMIT=75% (tight heap, no OOM)
+#   mem<=6GB         -> GOGC=50 + GOMEMLIMIT=75%
+kokoro_build_tuning() { # cpus mem_mb -> env lines
+    local cpus="$1" mem_mb="$2"
+    local goflags=""
+    if (( cpus <= 2 )); then
+        goflags="-p=1"
+    fi
+    printf 'GOFLAGS=%s\n' "$goflags"
+    if (( mem_mb <= 3072 )); then
+        printf 'GOGC=25\n'
+        printf 'GOMEMLIMIT=%dMiB\n' $(( mem_mb * 75 / 100 ))
+    elif (( mem_mb <= 6144 )); then
+        printf 'GOGC=50\n'
+        printf 'GOMEMLIMIT=%dMiB\n' $(( mem_mb * 75 / 100 ))
+    fi
+}
+
+kokoro_build_env() {
+    local cpus mem_mb line
+    cpus="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+    mem_mb="$(awk '/^MemTotal:/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 1024)"
+    [[ "$cpus" =~ ^[0-9]+$ ]] || cpus=1
+    [[ "$mem_mb" =~ ^[0-9]+$ ]] || mem_mb=1024
+
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && export "$line"
+    done < <(kokoro_build_tuning "$cpus" "$mem_mb")
+
+    if (( mem_mb <= 2048 )) && ! awk 'NR>1 && $1!=""' /proc/swaps 2>/dev/null | grep -q .; then
+        kokoro_warn "only ${mem_mb}MB RAM and no swap — Go build may OOM; add swap: fallocate -l 2G /swapfile && mkswap /swapfile && swapon /swapfile"
+    fi
+}
+
 kokoro_version_ge() {
     local have="$1" need="$2"
     local hm hn hp nm nn np
@@ -149,23 +197,25 @@ kokoro_caddy_install() {
     fi
 
     kokoro_pkg_install curl git ca-certificates tar
+    kokoro_build_env
     kokoro_go_for_caddy
     go_bin="$KOKORO_CADDY_GO_BIN"
     go_path="$(dirname "$go_bin"):${PATH}"
     PATH="$go_path"
-    GOBIN=/usr/local/bin "$go_bin" install "github.com/caddyserver/xcaddy/cmd/xcaddy@${KOKORO_XCADDY_VERSION}" \
+    export GOBIN=/usr/local/bin
+    kokoro_run_cmd "install xcaddy" "$go_bin" install "github.com/caddyserver/xcaddy/cmd/xcaddy@${KOKORO_XCADDY_VERSION}" \
         || kokoro_die "failed to install xcaddy ${KOKORO_XCADDY_VERSION}"
     [[ -x /usr/local/bin/xcaddy ]] || kokoro_die "xcaddy not found after install"
 
     if kokoro_caddy_needs_l4; then
         kokoro_log "building Caddy ${caddy_version} with caddy-l4 ${KOKORO_CADDY_L4_VERSION}"
         kokoro_log "this can take several minutes on small VPS instances"
-        kokoro_run_with_timer "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --with "github.com/mholt/caddy-l4@${KOKORO_CADDY_L4_VERSION}" --output "$dest" \
+        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --with "github.com/mholt/caddy-l4@${KOKORO_CADDY_L4_VERSION}" --output "$dest" \
             || kokoro_die "failed to build Caddy ${caddy_version}"
     else
         kokoro_log "building Caddy ${caddy_version}"
         kokoro_log "this can take several minutes on small VPS instances"
-        kokoro_run_with_timer "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --output "$dest" \
+        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --output "$dest" \
             || kokoro_die "failed to build Caddy ${caddy_version}"
     fi
 
