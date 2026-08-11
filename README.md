@@ -22,7 +22,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/speed-fix-from-vless-enc/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 ```
 
 Set up an edge:
@@ -42,7 +42,7 @@ sudo kokoro-xray exit
 Normal update keeps existing state:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/speed-fix-from-vless-enc/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 sudo kokoro-xray apply
 ```
 

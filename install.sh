@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_URL="${KOKORO_REPO_URL:-https://github.com/takashi728/kokoro-xray}"
 REPO_BRANCH="${KOKORO_REPO_BRANCH:-}"
-DEFAULT_REPO_BRANCH="${KOKORO_DEFAULT_REPO_BRANCH:-feature/upstream-hardening-vless-encryption}"
+DEFAULT_REPO_BRANCH="${KOKORO_DEFAULT_REPO_BRANCH:-codebase-redesign-with-func}"
 INSTALL_DIR="${KOKORO_INSTALL_DIR:-/opt/kokoro-xray}"
 CLEAN_INSTALL=false
 INSTALL_ARGS=()
