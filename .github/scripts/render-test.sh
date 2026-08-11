@@ -87,6 +87,7 @@ jq -e '.routing.rules[-1].outboundTag == "DIRECT"' "${OUT}/exit-xray.json" >/dev
 if command -v xray >/dev/null 2>&1; then
     echo "== xray -test =="
     xray run -test -config "${OUT}/edge-xray.json"
+    xray run -test -config "${OUT}/edge-sp-xray.json"
     xray run -test -config "${OUT}/exit-xray.json"
 else
     echo "skip xray -test (binary not installed)"
