@@ -23,6 +23,8 @@ readonly KOKORO_LAST_GOOD="${KOKORO_HOME}/last-good"
 : "${KOKORO_ROOT:=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 export KOKORO_ROOT
 
+source "${KOKORO_ROOT}/lib/state.sh"
+
 kokoro_ensure_state() {
     install -d -m 700 "${KOKORO_HOME}"
     install -d -m 700 "${KOKORO_LAST_GOOD}"
@@ -45,6 +47,7 @@ kokoro_ensure_state() {
         source "${KOKORO_ROOT}/lib/migrate.sh"
         kokoro_migrate 2>/dev/null || true
     fi
+    kokoro_state_refresh
 }
 
 kokoro_ensure_config() { kokoro_ensure_state; }
@@ -56,44 +59,6 @@ kokoro_check_secret_perms() {
         kokoro_warn "secrets.json should be mode 600 (got ${perms:-unknown})"
         chmod 600 "${KOKORO_SECRETS}" 2>/dev/null || true
     fi
-}
-
-kokoro_cfg() {
-    jq -r "$1" "${KOKORO_CONFIG}"
-}
-
-kokoro_cfg_set() {
-    local tmp
-    tmp="$(mktemp)"
-    jq "$1 = $2" "${KOKORO_CONFIG}" >"$tmp"
-    mv "$tmp" "${KOKORO_CONFIG}"
-}
-
-kokoro_cfg_set_str() {
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg v "$2" "$1 = \$v" "${KOKORO_CONFIG}" >"$tmp"
-    mv "$tmp" "${KOKORO_CONFIG}"
-}
-
-kokoro_sec() {
-    jq -r "$1" "${KOKORO_SECRETS}"
-}
-
-kokoro_sec_set_str() {
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg v "$2" "$1 = \$v" "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
-}
-
-kokoro_sec_set() {
-    local tmp
-    tmp="$(mktemp)"
-    jq "$1 = $2" "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
 }
 
 kokoro_log() { echo -e "${GREEN}[kokoro]${NC} $*"; }
