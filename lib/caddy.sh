@@ -138,10 +138,30 @@ kokoro_go_arch() {
     esac
 }
 
+kokoro_go_download() { # version arch tmp
+    local url="https://go.dev/dl/go${1}.linux-${2}.tar.gz"
+    curl -fsSL "$url" -o "${3}/go.tgz"
+}
+
+kokoro_go_first_downloadable() { # arch tmp -> version that downloads (or 1)
+    local arch="$1" tmp="$2" v
+    while IFS= read -r v; do
+        v="${v#go}"
+        [[ "$v" == "$KOKORO_GO_VERSION" ]] && continue
+        if kokoro_go_download "$v" "$arch" "$tmp"; then
+            printf '%s' "$v"
+            return 0
+        fi
+    done < <(curl -fsSL "https://go.dev/dl/?mode=json" 2>/dev/null \
+        | jq -r '[.[] | select(.stable == true)][0:5][] | .version' 2>/dev/null)
+    return 1
+}
+
 kokoro_go_install_official() {
-    local arch url tmp prefix go_bin version
+    local arch tmp prefix go_bin version go_version
     arch="$(kokoro_go_arch)"
-    prefix="${KOKORO_GO_PREFIX}/go${KOKORO_GO_VERSION}"
+    go_version="$KOKORO_GO_VERSION"
+    prefix="${KOKORO_GO_PREFIX}/go${go_version}"
     go_bin="${prefix}/bin/go"
 
     if [[ -x "$go_bin" ]]; then
@@ -153,14 +173,20 @@ kokoro_go_install_official() {
     fi
 
     kokoro_pkg_install curl git ca-certificates tar
-    url="https://go.dev/dl/go${KOKORO_GO_VERSION}.linux-${arch}.tar.gz"
     tmp="$(mktemp -d)"
 
     kokoro_log "installing Go ${KOKORO_GO_VERSION} for Caddy build"
-    curl -fsSL "$url" -o "${tmp}/go.tgz" || kokoro_die "failed to download Go ${KOKORO_GO_VERSION}"
+    if ! kokoro_go_download "$go_version" "$arch" "$tmp"; then
+        go_version="$(kokoro_go_first_downloadable "$arch" "$tmp")" \
+            || kokoro_die "failed to download Go ${KOKORO_GO_VERSION}"
+        kokoro_warn "Go ${KOKORO_GO_VERSION} unavailable; falling back to ${go_version}"
+        prefix="${KOKORO_GO_PREFIX}/go${go_version}"
+        go_bin="${prefix}/bin/go"
+    fi
+
     rm -rf "$prefix"
     install -d "$KOKORO_GO_PREFIX"
-    tar -C "$KOKORO_GO_PREFIX" -xzf "${tmp}/go.tgz" || kokoro_die "failed to extract Go ${KOKORO_GO_VERSION}"
+    tar -C "$KOKORO_GO_PREFIX" -xzf "${tmp}/go.tgz" || kokoro_die "failed to extract Go ${go_version}"
     mv "${KOKORO_GO_PREFIX}/go" "$prefix"
     rm -rf "$tmp"
     [[ -x "$go_bin" ]] || kokoro_die "Go install failed: $go_bin missing"
