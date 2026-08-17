@@ -28,7 +28,7 @@ print_banner() {
 /_/|_|\____/_/|_|\____/_/   \____/     /_/|_/_/   \__,_/\__, /
                                                        /____/
 
-  ( fast enough to outrun a block )
+  ( kokoro 心 — with heart, at full speed )
 EOF
     printf '%b\n' "${NC}"
 }
