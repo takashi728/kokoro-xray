@@ -1,15 +1,15 @@
 # kokoro-xray
 
-Xray のエッジ/エグジット構築用の小さなシェルマネージャーです。
+Xray のエッジ/エグジット構築用の小さなシェルマネージャーだにゃ〜
 
-スクリプトは状態を JSON で保持し、`jq` で設定をレンダリングし、リロード前に検証を行い、大きなフレームワークへの依存を避けています。
+スクリプトは状態を JSON で保持し、`jq` で設定をレンダリングし、リロード前に検証を行い、大きなフレームワークへの依存をさけているにゃ。
 
-[English](README.md) | 日本語
+[English](README.md) | [日本語](README.ja.md)
 
 ## サポートモード
 
 - エッジ単一ノード: VLESS XHTTP REALITY、TLS、または両方
-- エッジ + エグジット: エッジが WireGuard を介してトラフィックをエグジットに転送
+- エッジ + エグジット: エッジが WireGuard を経てトラフィックをエグジットに転送
 - TLS エッジ: Caddy が ACME と HTTPS ルーティングを処理
 - REALITY エッジ: Xray がパブリックの `:443` を直接提供
 
@@ -27,13 +27,13 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 ```
 
-エッジをセットアップ:
+エッジをセットアップにゃ:
 
 ```bash
 sudo kokoro-xray edge
 ```
 
-エグジットをセットアップ:
+エグジットをセットアップにゃ:
 
 ```bash
 sudo kokoro-xray exit
@@ -41,14 +41,14 @@ sudo kokoro-xray exit
 
 ## 更新
 
-通常の更新では既存の状態を保持します:
+ふつうの更新では既存の状態を保持するにゃ:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 sudo kokoro-xray apply
 ```
 
-クリーンな再インストールは `/opt/kokoro-xray` を削除し、`~/.kokoro-xray` を保持します:
+クリーンな再インストールは `/opt/kokoro-xray` を削除し、`~/.kokoro-xray` は保持するにゃ:
 
 ```bash
 sudo kokoro-xray reinstall
@@ -84,7 +84,7 @@ sudo kokoro-xray apply
 
 ## クライアント出力
 
-標準の共有リンク:
+標準の共有リンクにゃ:
 
 ```bash
 kokoro-xray link
@@ -96,7 +96,7 @@ kokoro-xray link
 kokoro-xray link --json tls
 ```
 
-TLS モードでは、クライアントアプリが URL サブスクリプションから高度な XHTTP 設定を保持できない場合は JSON エクスポートを使用してください。
+TLS モードでは、クライアントアプリが URL サブスクリプションから高度な XHTTP 設定を保持できない場合は JSON エクスポートを使ってねにゃ。
 
 ## コマンド
 
@@ -120,21 +120,21 @@ TLS モードでは、クライアントアプリが URL サブスクリプシ�
 
 ## VLESS 暗号化
 
-新規エッジインストールでは Xray-core の VLESS 暗号化を有効にします。公式の
-`xray vlessenc` コマンドが X25519 認証済みペアを 1 組生成し、一時的な鍵交換は
-ポスト量子耐性を維持します。サーバーとクライアントの文字列は `secrets.json`
-に保持されます。
+新規エッジインストールでは Xray-core の VLESS 暗号化を有効にするにゃ。
+公式の `xray vlessenc` コマンドが X25519 認証済みペアを 1 組生成し、一時的な鍵交換は
+ポスト量子耐性を保つにゃ。サーバーとクライアントの文字列は `secrets.json`
+に保持されるにゃ。
 
-既存ノードは現在のクライアントを維持するため、暗号化を無効のままアップグレードします:
+既存ノードは現在のクライアントを維持するため、暗号化を無効のままアップグレードするにゃ:
 
 ```bash
 sudo kokoro-xray vless-encryption on
 kokoro-xray link
 ```
 
-有効化・無効化はすべてのクライアントプロファイルを変更します。その後にリンクを再取得してください。
-VLESS レイヤーは XHTTP 内部のペイロードを保護します。トランスポートのセキュリティと
-検閲回避には引き続き TLS または REALITY が必要です。
+有効化・無効化はすべてのクライアントプロファイルを変更するにゃ。その後にリンクを再取得してねにゃ。
+VLESS レイヤーは XHTTP 内部のペイロードを保護するにゃ。トランスポートのセキュリティと
+検閲回避には引き続き TLS または REALITY が必要だにゃ。
 
 ## REALITY ターゲットスキャン
 
@@ -145,7 +145,7 @@ kokoro-xray reality scan --apply
 sudo kokoro-xray apply
 ```
 
-スキャナは DNS、TLS 1.3、ALPN `h2`、証明書カバレッジ、リダイレクト動作を確認します。
+スキャナは DNS、TLS 1.3、ALPN `h2`、証明書カバレッジ、リダイレクト動作を確認するにゃ。
 
 ## ファイル
 
@@ -158,12 +158,12 @@ sudo kokoro-xray apply
 
 ## 備考
 
-- Xray のダウンロードはアップストリームの SHA256 ダイジェストファイルで検証されます。
-- Xray-core は最新かつテスト済みの安定リリースにピン留めされています。
-- Caddy ビルドはピン留めされており、必要な場合のみ再ビルドされます。
-- ディストリビューションの Go が古い場合、Caddy ビルドは `/usr/local/kokoro-go` 以下の管理済み Go ツールチェーンを使用します。
-- ファイアウォール対応を有効にすると、UFW は受信デニ・送信アローがデフォルトになります。
-- XMUX はスループットのために `maxConcurrency: "5-10"` を使用します。Xray-core v26.6.27 以降はデフォルトが `maxConnections: 6` (anti-RKN) に変更されましたが、これは HTTP/2 の接続プールを制限し、大容量ダウンロードのボトルネックになります。`maxConcurrency: "5-10"` は接続内での多重化を許可しつつ、フィンガープリンティングを避けるため値をランダム化します。
+- Xray のダウンロードはアップストリームの SHA256 ダイジェストファイルで検証されるにゃ。
+- Xray-core は最新かつテスト済みの安定リリースにピン留めされているにゃ。
+- Caddy ビルドはピン留めされており、必要な場合のみ再ビルドされるにゃ。
+- ディストリビューションの Go が古い場合、Caddy ビルドは `/usr/local/kokoro-go` 以下の管理済み Go ツールチェーンを使うにゃ。
+- ファイアウォール対応を有効にすると、UFW は受信デニ・送信アローがデフォルトになるにゃ。
+- XMUX はスループットのために `maxConcurrency: "5-10"` を使うにゃ。Xray-core v26.6.27 以降はデフォルトが `maxConnections: 6` (anti-RKN) に変更されたが、これは HTTP/2 の接続プールを制限し、大容量ダウンロードのボトルネックになるにゃ。`maxConcurrency: "5-10"` は接続内での多重化を許可しつつ、フィンガープリンティングを避けるため値をランダム化するにゃ。
 
 ## ライセンス
 

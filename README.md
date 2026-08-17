@@ -4,7 +4,7 @@ Small shell manager for Xray edge/exit deployments.
 
 The scripts keep state in JSON, render configs with `jq`, validate before reload, and avoid large framework dependencies.
 
-[English](README.md) | [日本語](README.ja.md)
+[English](README.md) | [日本語 (猫娘)](README.ja.md)
 
 ## Supported Modes
 
