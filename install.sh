@@ -13,10 +13,25 @@ INSTALL_ARGS=()
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 export PATH
 
-RED='\033[31m'; GREEN='\033[32m'; NC='\033[0m'
+RED='\033[31m'; GREEN='\033[32m'; CYAN='\033[36m'; NC='\033[0m'
 
 die() { echo -e "${RED}[error]${NC} $*" >&2; exit 1; }
 log() { echo -e "${GREEN}[kokoro]${NC} $*"; }
+
+print_banner() {
+    printf '%b' "${CYAN}"
+    cat <<'EOF'
+    __         __
+   / /______  / /______  _________        _  ___________ ___  __
+  / //_/ __ \/ //_/ __ \/ ___/ __ \______| |/_/ ___/ __ `/ / / /
+ / ,< / /_/ / ,< / /_/ / /  / /_/ /_____/>  </ /  / /_/ / /_/ /
+/_/|_|\____/_/|_|\____/_/   \____/     /_/|_/_/   \__,_/\__, /
+                                                       /____/
+EOF
+    printf '%b\n' "${NC}"
+}
+
+print_banner
 
 [[ "${EUID}" -eq 0 ]] || die "run as root"
 
