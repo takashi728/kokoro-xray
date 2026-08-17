@@ -4,6 +4,8 @@ Small shell manager for Xray edge/exit deployments.
 
 The scripts keep state in JSON, render configs with `jq`, validate before reload, and avoid large framework dependencies.
 
+[English](README.md) | [日本語](README.ja.md)
+
 ## Supported Modes
 
 - Edge single-node: VLESS XHTTP REALITY, TLS, or both
