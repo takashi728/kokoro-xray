@@ -1,5 +1,9 @@
 # kokoro-xray
 
+<p align="center">
+  <img src="docs/img/kokoro-neko.jpg" alt="kokoro-xray" width="360">
+</p>
+
 Xray のエッジ/エグジット構築用の小さなシェルマネージャーだにゃ〜
 
 スクリプトは状態を JSON で保持し、`jq` で設定をレンダリングし、リロード前に検証を行い、大きなフレームワークへの依存をさけているにゃ。
