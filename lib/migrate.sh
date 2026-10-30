@@ -40,34 +40,12 @@ kokoro_migrate() {
         kokoro_log "migrated config 0.4.0 → 0.5.0"
     fi
 
-    kokoro_migrate_remove_retired_features
-
     if ! jq -e '.firewall' "${KOKORO_CONFIG}" >/dev/null 2>&1; then
         tmp="$(mktemp)"
         jq '.firewall = {"enabled": true, "ssh_port": 0, "extra_allow": []}' \
             "${KOKORO_CONFIG}" >"$tmp"
         mv "$tmp" "${KOKORO_CONFIG}"
     fi
-}
-
-kokoro_migrate_remove_retired_features() {
-    local tmp
-
-    tmp="$(mktemp)"
-    jq 'del(
-          .inbound.hysteria,
-          .multinode.finalmask,
-          .paths.hysteria_cert,
-          .paths.hysteria_key
-        )' \
-        "${KOKORO_CONFIG}" >"$tmp"
-    mv "$tmp" "${KOKORO_CONFIG}"
-    chmod 644 "${KOKORO_CONFIG}"
-
-    tmp="$(mktemp)"
-    jq 'del(.inbound.hysteria)' "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
 }
 
 kokoro_migrate_merge_defaults() {

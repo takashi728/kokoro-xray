@@ -32,6 +32,12 @@ preflight.sh → render.jq + caddy.jq → validate.sh → firewall.sh → reload
 Caddy overwrites `Kokoro-Trusted-XFF` on TLS proxy requests. Xray trusts
 `X-Forwarded-For` only when that marker arrives over its loopback listener.
 
+Hysteria2 is an optional parallel UDP inbound, not another XHTTP mode. Xray
+listens on its configured UDP port list. Caddy manages the public certificate,
+serves the same domain over TCP, and disables its own HTTP/3 listener to avoid
+contending for UDP `443`. REALITY-only mode moves behind Caddy L4 when
+Hysteria2 is enabled so both domains can keep TCP `443`.
+
 ## VLESS Encryption
 
 Fresh edge installs generate one official X25519-authenticated VLESS Encryption

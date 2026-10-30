@@ -106,10 +106,10 @@ kokoro_firewall_warn_only() {
     case "$role" in
         edge)
             if [[ "$mode" == "tls" || "$mode" == "both" || "$mode" == "reality" ]]; then
-                kokoro_warn "firewall disabled — ensure: 443/tcp"
+                kokoro_warn "firewall disabled — ensure: 443/tcp, 80/tcp"
             fi
-            if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
-                kokoro_warn "firewall disabled — ensure: 80/tcp for ACME"
+            if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
+                kokoro_warn "firewall disabled — also allow UDP: $(kokoro_cfg '.inbound.hysteria.ports')"
             fi
             ;;
         exit)
@@ -119,7 +119,7 @@ kokoro_firewall_warn_only() {
 }
 
 kokoro_firewall_service_rules() {
-    local role mode wg_port
+    local role mode wg_port item spec
     role="$(kokoro_cfg '.role')"
     mode="$(kokoro_cfg '.inbound.mode')"
     wg_port="$(kokoro_cfg '.multinode.exit_port')"
@@ -128,9 +128,13 @@ kokoro_firewall_service_rules() {
         edge)
             if [[ "$mode" == "tls" || "$mode" == "both" || "$mode" == "reality" ]]; then
                 kokoro_firewall_ufw_allow "443/tcp" "kokoro-xray"
-            fi
-            if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
                 kokoro_firewall_ufw_allow "80/tcp" "kokoro-acme"
+            fi
+            if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
+                while IFS= read -r item; do
+                    spec="$(kokoro_firewall_parse_allow "${item}/udp")"
+                    kokoro_firewall_ufw_allow "$spec" "kokoro-hysteria2"
+                done < <(printf '%s\n' "$(kokoro_cfg '.inbound.hysteria.ports')" | tr ',' '\n')
             fi
             ;;
         exit)

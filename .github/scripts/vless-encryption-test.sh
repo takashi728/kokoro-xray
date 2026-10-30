@@ -60,10 +60,10 @@ kokoro_ensure_state
 [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled')" == "false" ]]
 [[ "$(kokoro_sec '.inbound.uuid')" == "preserve-me" ]]
 [[ -z "$(kokoro_sec '.inbound.vless_encryption.decryption')" ]]
-[[ "$(kokoro_cfg 'has("inbound") and (.inbound | has("hysteria") | not)')" == "true" ]]
-[[ "$(kokoro_cfg '.multinode | has("finalmask")')" == "false" ]]
-[[ "$(kokoro_cfg '.paths | has("hysteria_cert") or has("hysteria_key")')" == "false" ]]
-[[ "$(kokoro_sec '.inbound | has("hysteria")')" == "false" ]]
+[[ "$(kokoro_cfg '.inbound | has("hysteria")')" == "true" ]]
+[[ "$(kokoro_cfg '.multinode | has("finalmask")')" == "true" ]]
+[[ "$(kokoro_cfg '.paths | has("hysteria_cert") and has("hysteria_key")')" == "true" ]]
+[[ "$(kokoro_sec '.inbound | has("hysteria")')" == "true" ]]
 SCRIPT
 echo "migration_safe_default OK"
 

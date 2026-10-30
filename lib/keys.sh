@@ -14,6 +14,7 @@ kokoro_rand_path() {
 }
 
 kokoro_rand_short_id() { openssl rand -hex 4; }
+kokoro_rand_secret() { openssl rand -hex 32; }
 
 kokoro_gen_uuid() {
     local xray_bin
@@ -71,6 +72,20 @@ kokoro_ensure_vless_encryption_keys() {
     fi
 }
 
+kokoro_ensure_hysteria_secrets() {
+    local auth obfs
+    [[ "$(kokoro_cfg '.role')" == "edge" ]] || return 0
+    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
+    auth="$(kokoro_sec '.inbound.hysteria.auth')"
+    obfs="$(kokoro_sec '.inbound.hysteria.obfs_password')"
+    if [[ -z "$auth" || "$auth" == "null" ]]; then
+        kokoro_sec_set_str '.inbound.hysteria.auth' "$(kokoro_rand_secret)"
+    fi
+    if [[ -z "$obfs" || "$obfs" == "null" ]]; then
+        kokoro_sec_set_str '.inbound.hysteria.obfs_password' "$(kokoro_rand_secret)"
+    fi
+}
+
 kokoro_gen_edge_wg_keys() {
     local priv pub
     priv="$(wg genkey)"
@@ -113,6 +128,7 @@ kokoro_gen_edge_secrets() {
     kokoro_sec_set '.inbound.reality.short_ids' "[\"${sid}\"]"
     kokoro_gen_reality_keys
     kokoro_ensure_vless_encryption_keys
+    kokoro_ensure_hysteria_secrets
     kokoro_gen_edge_wg_keys
 }
 

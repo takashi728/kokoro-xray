@@ -76,7 +76,8 @@ kokoro_need_cmd() {
 kokoro_caddy_required() {
     local mode
     mode="$(kokoro_cfg '.inbound.mode')"
-    [[ "$mode" == "tls" || "$mode" == "both" ]]
+    [[ "$mode" == "tls" || "$mode" == "both" ||
+       "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]
 }
 
 kokoro_load_i18n() {
