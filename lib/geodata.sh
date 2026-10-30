@@ -3,7 +3,7 @@
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
-KOKORO_XRAY_VERSION="${KOKORO_XRAY_VERSION:-v26.7.11}"
+KOKORO_XRAY_VERSION="${KOKORO_XRAY_VERSION:-v26.10.29}"
 
 kokoro_xray_release_arch() {
     local arch
