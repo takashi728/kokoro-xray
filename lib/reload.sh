@@ -25,9 +25,9 @@ kokoro_hysteria_cert_service_unit() {
 }
 
 kokoro_hysteria_cert_reload_sync() {
-    local cert key enabled unit_dir path_unit service_unit path_tmp service_tmp changed=false
+    local cert key enabled unit_dir path_unit service_unit changed=false
     enabled="$(kokoro_cfg '.inbound.hysteria.enabled // false')"
-    unit_dir="${KOKORO_SYSTEMD_UNIT_DIR:-/etc/systemd/system}"
+    unit_dir="$(kokoro_systemd_unit_dir)"
     path_unit="${unit_dir}/kokoro-hysteria-cert.path"
     service_unit="${unit_dir}/kokoro-hysteria-cert-reload.service"
 
@@ -39,19 +39,19 @@ kokoro_hysteria_cert_reload_sync() {
     else
         cert="$(kokoro_cfg '.paths.hysteria_cert')"
         key="$(kokoro_cfg '.paths.hysteria_key')"
-        [[ -f "$cert" && -f "$key" ]] || kokoro_die "Hysteria2 certificate files missing for renewal watcher"
-        install -d "$unit_dir"
-        path_tmp="${path_unit}.tmp.$$"
-        service_tmp="${service_unit}.tmp.$$"
-        kokoro_hysteria_cert_path_unit "$cert" "$key" >"$path_tmp"
-        kokoro_hysteria_cert_service_unit >"$service_tmp"
-        if ! cmp -s "$path_tmp" "$path_unit" ||
-           ! cmp -s "$service_tmp" "$service_unit"; then
-            install -m 644 "$path_tmp" "$path_unit"
-            install -m 644 "$service_tmp" "$service_unit"
+        kokoro_require_hysteria_file '.paths.hysteria_cert' '.crt'
+        kokoro_require_hysteria_file '.paths.hysteria_key' '.key'
+        local path_content service_content
+        path_content="$(kokoro_hysteria_cert_path_unit "$cert" "$key")"
+        service_content="$(kokoro_hysteria_cert_service_unit)"
+        if [[ "$path_content" != "$(cat "$path_unit" 2>/dev/null || true)" ]]; then
+            kokoro_install_systemd_unit kokoro-hysteria-cert.path "$path_content"
             changed=true
         fi
-        rm -f "$path_tmp" "$service_tmp"
+        if [[ "$service_content" != "$(cat "$service_unit" 2>/dev/null || true)" ]]; then
+            kokoro_install_systemd_unit kokoro-hysteria-cert-reload.service "$service_content"
+            changed=true
+        fi
     fi
 
     if [[ "$changed" == "true" ]]; then

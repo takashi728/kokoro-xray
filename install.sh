@@ -4,9 +4,9 @@
 set -euo pipefail
 
 REPO_URL="${KOKORO_REPO_URL:-https://github.com/takashi728/kokoro-xray}"
-REPO_BRANCH="${KOKORO_REPO_BRANCH:-}"
-DEFAULT_REPO_BRANCH="${KOKORO_DEFAULT_REPO_BRANCH:-codebase-redesign-with-func}"
+REPO_COMMIT="${KOKORO_REPO_COMMIT:-}"
 INSTALL_DIR="${KOKORO_INSTALL_DIR:-/opt/kokoro-xray}"
+INSTALL_SOURCE="${KOKORO_INSTALL_SOURCE:-auto}"
 CLEAN_INSTALL=false
 INSTALL_ARGS=()
 
@@ -45,10 +45,18 @@ while [[ $# -gt 0 ]]; do
             CLEAN_INSTALL=true
             shift
             ;;
-        --branch)
-            [[ -n "${2:-}" ]] || die "--branch requires a branch name"
-            REPO_BRANCH="$2"
+        --commit)
+            [[ "${2:-}" =~ ^[0-9a-f]{40}$ ]] || die "--commit requires a full 40-character SHA"
+            REPO_COMMIT="$2"
             shift 2
+            ;;
+        --local)
+            INSTALL_SOURCE=local
+            shift
+            ;;
+        --remote)
+            INSTALL_SOURCE=remote
+            shift
             ;;
         *)
             INSTALL_ARGS+=("$1")
@@ -56,6 +64,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+[[ "$INSTALL_SOURCE" == "auto" || "$INSTALL_SOURCE" == "local" || "$INSTALL_SOURCE" == "remote" ]] ||
+    die "KOKORO_INSTALL_SOURCE must be auto, local, or remote"
 
 safe_install_dir() {
     [[ -n "$INSTALL_DIR" ]] || die "KOKORO_INSTALL_DIR is empty"
@@ -113,16 +124,35 @@ install_bootstrap_deps() {
 
 install_local() {
     local src="$SCRIPT_DIR" staged="${INSTALL_DIR}.new.$$" old="${INSTALL_DIR}.old.$$"
+    local source_commit="" recorded_commit=""
     [[ -f "${src}/kokoro-xray.sh" ]] || die "run from repo root or set KOKORO_REPO_URL"
+    if [[ -d "${src}/.git" ]]; then
+        source_commit="$(git -C "$src" rev-parse HEAD 2>/dev/null || true)"
+        [[ -z "$(git -C "$src" status --porcelain --untracked-files=no 2>/dev/null)" ]] ||
+            die "local checkout has uncommitted tracked changes"
+    elif [[ -f "${src}/.kokoro-install-commit" ]]; then
+        source_commit="$(tr -d '[:space:]' <"${src}/.kokoro-install-commit")"
+    fi
+    [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] ||
+        die "local tree has no verifiable Git revision"
+    [[ -n "$REPO_COMMIT" ]] || REPO_COMMIT="$source_commit"
+    [[ "$source_commit" == "$REPO_COMMIT" ]] ||
+        die "local checkout ${source_commit} does not match reviewed commit ${REPO_COMMIT}"
+    if [[ -f "${src}/.kokoro-install-commit" ]]; then
+        recorded_commit="$(tr -d '[:space:]' <"${src}/.kokoro-install-commit")"
+        [[ "$recorded_commit" == "$source_commit" ]] ||
+            die "recorded local revision ${recorded_commit:-unset} does not match checkout ${source_commit}"
+    fi
     safe_install_dir
+    if [[ "$CLEAN_INSTALL" == "true" ]] &&
+        [[ "$(realpath -m -- "$src")" == "$(realpath -m -- "$INSTALL_DIR")" ]]; then
+        die "clean reinstall from the live install dir requires --remote"
+    fi
     rm -rf -- "$staged"
     install -d "$staged"
     cp -a "${src}/." "$staged/"
-    if [[ "$CLEAN_INSTALL" == "true" ]]; then
-        if [[ "$(readlink -f "$src")" == "$(readlink -f "$INSTALL_DIR" 2>/dev/null || printf '%s' "$INSTALL_DIR")" ]]; then
-            die "clean reinstall from the live install dir requires --branch BRANCH"
-        fi
-    fi
+    printf '%s\n' "$source_commit" >"${staged}/.kokoro-install-commit"
+    chmod 644 "${staged}/.kokoro-install-commit"
     if [[ -e "$INSTALL_DIR" ]]; then
         rm -rf -- "$old"
         mv "$INSTALL_DIR" "$old"
@@ -138,17 +168,34 @@ install_local() {
     chmod 644 "${INSTALL_DIR}/data/"*.txt 2>/dev/null || true
 }
 
+mark_installed_commit() { # commit
+    local commit="$1" state_dir="${HOME}/.kokoro-xray"
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "cannot record invalid installed commit"
+    install -d -m 700 "$state_dir"
+    printf '%s\n' "$commit" >"${state_dir}/installed-commit"
+    chmod 644 "${state_dir}/installed-commit"
+}
+
 install_remote() {
-    local staged="${INSTALL_DIR}.new.$$" old="${INSTALL_DIR}.old.$$"
+    local staged="${INSTALL_DIR}.new.$$" old="${INSTALL_DIR}.old.$$" head
+    [[ -n "$REPO_COMMIT" ]] ||
+        die "remote install requires --commit or KOKORO_REPO_COMMIT"
     safe_install_dir
     rm -rf -- "$staged"
-    if [[ -n "$REPO_BRANCH" ]]; then
-        git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$staged" ||
-            { rm -rf -- "$staged"; die "failed to clone ${REPO_BRANCH}"; }
-    else
-        git clone --depth 1 "$REPO_URL" "$staged" ||
-            { rm -rf -- "$staged"; die "failed to clone repository"; }
+    git init -q "$staged" || { rm -rf -- "$staged"; die "failed to initialize staging repository"; }
+    git -C "$staged" remote add origin "$REPO_URL" ||
+        { rm -rf -- "$staged"; die "failed to configure repository origin"; }
+    git -C "$staged" fetch --depth 1 origin "$REPO_COMMIT" ||
+        { rm -rf -- "$staged"; die "failed to fetch reviewed commit ${REPO_COMMIT}"; }
+    git -C "$staged" checkout --detach --force FETCH_HEAD ||
+        { rm -rf -- "$staged"; die "failed to check out reviewed commit ${REPO_COMMIT}"; }
+    head="$(git -C "$staged" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "$head" != "$REPO_COMMIT" ]]; then
+        rm -rf -- "$staged"
+        die "cloned commit ${head:-unknown} does not match reviewed commit ${REPO_COMMIT}"
     fi
+    printf '%s\n' "$REPO_COMMIT" >"${staged}/.kokoro-install-commit"
+    chmod 644 "${staged}/.kokoro-install-commit"
     if [[ -e "$INSTALL_DIR" ]]; then
         rm -rf -- "$old"
         mv "$INSTALL_DIR" "$old"
@@ -166,26 +213,33 @@ install_remote() {
 
 install_bootstrap_deps
 
-if [[ -z "$REPO_BRANCH" ]]; then
-    if [[ "$CLEAN_INSTALL" == "true" && -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
-        REPO_BRANCH="$(git -C "$SCRIPT_DIR" branch --show-current 2>/dev/null || true)"
-        REPO_BRANCH="${REPO_BRANCH:-$DEFAULT_REPO_BRANCH}"
-    elif [[ ! -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
-        REPO_BRANCH="$DEFAULT_REPO_BRANCH"
+has_local_tree=false
+if [[ -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
+    has_local_tree=true
+fi
+
+if [[ "$INSTALL_SOURCE" == "auto" ]]; then
+    if [[ "$CLEAN_INSTALL" == "true" || "$has_local_tree" != "true" ]]; then
+        INSTALL_SOURCE=remote
+    else
+        INSTALL_SOURCE=local
     fi
 fi
 
-if [[ -n "$REPO_BRANCH" ]]; then
+if [[ "$INSTALL_SOURCE" == "local" && "$has_local_tree" != "true" ]]; then
+    die "local install source requested but no repository checkout was found"
+fi
+
+if [[ "$INSTALL_SOURCE" == "remote" ]]; then
     install_remote
-elif [[ -f "${SCRIPT_DIR}/kokoro-xray.sh" ]]; then
-    install_local
 else
-    install_remote
+    install_local
 fi
 
 ln -sf "${INSTALL_DIR}/kokoro-xray.sh" /usr/local/bin/kokoro-xray
 
 install -d -m 700 "${HOME}/.kokoro-xray"
+mark_installed_commit "$REPO_COMMIT"
 if [[ ! -f "${HOME}/.kokoro-xray/config.json" ]]; then
     cp "${INSTALL_DIR}/config.defaults.json" "${HOME}/.kokoro-xray/config.json"
     chmod 644 "${HOME}/.kokoro-xray/config.json"
@@ -199,7 +253,11 @@ log "installed to ${INSTALL_DIR}"
 log "run: kokoro-xray"
 
 run_installed() {
-    if [[ ! -t 0 ]] && exec 3</dev/tty 2>/dev/null; then
+    local tty_fd=false
+    if [[ ! -t 0 ]] && { exec 3</dev/tty; } 2>/dev/null; then
+        tty_fd=true
+    fi
+    if [[ "$tty_fd" == "true" ]]; then
         exec "$@" <&3 3<&-
     fi
     exec "$@"

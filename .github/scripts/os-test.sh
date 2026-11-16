@@ -36,7 +36,7 @@ for role in edge exit; do
 done
 
 bootstrap_line="$(line_exact 'install_bootstrap_deps' "${ROOT}/install.sh")"
-install_line="$(line_exact 'if [[ -n "$REPO_BRANCH" ]]; then' "${ROOT}/install.sh")"
+install_line="$(line_exact 'if [[ "$INSTALL_SOURCE" == "remote" ]]; then' "${ROOT}/install.sh")"
 [[ "$bootstrap_line" -lt "$install_line" ]]
 
 for package in jq openssl uuid-runtime wireguard-tools ufw; do

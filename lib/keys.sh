@@ -18,6 +18,7 @@ kokoro_rand_secret() { openssl rand -hex 32; }
 
 kokoro_gen_uuid() {
     local xray_bin
+    kokoro_validate_service_paths
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
     if [[ -x "$xray_bin" ]]; then
         "$xray_bin" uuid
@@ -28,6 +29,7 @@ kokoro_gen_uuid() {
 
 kokoro_gen_reality_keys() {
     local xray_bin out priv pub
+    kokoro_validate_service_paths
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
     [[ -x "$xray_bin" ]] || kokoro_die "xray not installed"
     out="$("$xray_bin" x25519)"
@@ -45,6 +47,7 @@ kokoro_gen_reality_keys() {
 
 kokoro_gen_vless_encryption_keys() {
     local xray_bin out decryption encryption
+    kokoro_validate_service_paths
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
     [[ -x "$xray_bin" ]] || kokoro_die "xray not installed"
     out="$("$xray_bin" vlessenc)"
@@ -61,6 +64,7 @@ kokoro_gen_vless_encryption_keys() {
 
 kokoro_ensure_vless_encryption_keys() {
     local decryption encryption
+    kokoro_validate_service_paths
     [[ "$(kokoro_cfg '.role')" == "edge" ]] || return 0
     [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled // false')" == "true" ]] || return 0
     decryption="$(kokoro_sec '.inbound.vless_encryption.decryption')"
@@ -120,6 +124,7 @@ kokoro_secrets_exist() {
 
 kokoro_gen_edge_secrets() {
     local uuid path sid
+    kokoro_validate_service_paths
     uuid="$(kokoro_gen_uuid)"
     path="$(kokoro_rand_path)"
     sid="$(kokoro_rand_short_id)"

@@ -25,16 +25,7 @@ kokoro_preflight() {
     kokoro_check_secret_perms
 }
 
-kokoro_preflight_paths() {
-    local key value
-    for key in \
-        '.paths.xray_config' \
-        '.paths.xray_bin' \
-        '.paths.geo_dir'; do
-        value="$(kokoro_cfg "$key")"
-        [[ -n "$value" && "$value" != "null" ]] || kokoro_die "missing required config path: $key"
-    done
-}
+kokoro_preflight_paths() { kokoro_validate_service_paths; }
 
 kokoro_preflight_edge() {
     local mode="$1" cdn decryption encryption
@@ -88,8 +79,6 @@ kokoro_preflight_hysteria() {
     ports="$(kokoro_cfg '.inbound.hysteria.ports')"
     interval="$(kokoro_cfg '.inbound.hysteria.hop_interval')"
     masquerade="$(kokoro_cfg '.inbound.hysteria.masquerade' | tr '[:upper:]' '[:lower:]')"
-    cert="$(kokoro_cfg '.paths.hysteria_cert')"
-    key="$(kokoro_cfg '.paths.hysteria_key')"
 
     [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] ||
         kokoro_die "invalid Hysteria2 domain: $domain"
@@ -109,8 +98,8 @@ kokoro_preflight_hysteria() {
     to="${interval##*-}"
     [[ "$from" -ge 5 && "$to" -ge "$from" ]] || kokoro_die "Hysteria2 hop interval must be >=5 seconds"
 
-    [[ -f "$cert" ]] || kokoro_die "Hysteria2 certificate missing: $cert"
-    [[ -f "$key" ]] || kokoro_die "Hysteria2 private key missing: $key"
+    kokoro_require_hysteria_file '.paths.hysteria_cert' '.crt'
+    kokoro_require_hysteria_file '.paths.hysteria_key' '.key'
     [[ -n "$(kokoro_sec '.inbound.hysteria.auth')" ]] || kokoro_die "missing Hysteria2 auth secret"
     [[ -n "$(kokoro_sec '.inbound.hysteria.obfs_password')" ]] || kokoro_die "missing Hysteria2 obfs secret"
 }

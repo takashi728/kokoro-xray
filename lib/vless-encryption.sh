@@ -12,6 +12,7 @@ kokoro_vless_encryption_require_edge() {
 kokoro_vless_encryption_enable() {
     kokoro_need_root
     kokoro_ensure_state
+    kokoro_validate_service_paths
     kokoro_vless_encryption_require_edge
     kokoro_cfg_set '.inbound.vless_encryption.enabled' 'true'
     kokoro_ensure_vless_encryption_keys

@@ -27,9 +27,20 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 
 ## インストール
 
+導入するリリースで記録した 40 文字の完全な SHA を
+`<reviewed-commit>` に置き換え、不変のレビュー済みコミットから
+インストーラーを取得して、同じ SHA をブートストラップに渡すにゃ:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
+commit=<reviewed-commit>
+curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
+    -o /tmp/kokoro-install.sh
+sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
 ```
+
+インストーラーにはフォールバックのコミットがないにゃ。実インストールを
+置き換える前に、ステージ済みリポジトリが指定したコミットと完全に一致することを
+検証し、一致しなければ起動前に中止するにゃ。
 
 エッジをセットアップにゃ:
 
@@ -45,10 +56,10 @@ sudo kokoro-xray exit
 
 ## 更新
 
-ふつうの更新では既存の状態を保持するにゃ:
+ふつうの更新では既存の状態を保持するにゃ。**インストール**にある
+レビュー済みの不変ブートストラップを取得して実行した後:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 sudo kokoro-xray apply
 ```
 
@@ -58,6 +69,11 @@ sudo kokoro-xray apply
 sudo kokoro-xray reinstall
 sudo kokoro-xray apply
 ```
+
+コミット固定を導入する前のインストールには
+`~/.kokoro-xray/installed-commit` がないにゃ。`reinstall` を使う前に、
+固定済みブートストラップを一度だけ再実行してねにゃ。ブートストラップが
+ノード状態を変更せずに信頼済みリビジョンを記録するにゃ。
 
 ## 基本フロー
 
@@ -120,7 +136,7 @@ TLS モードでは、クライアントアプリが URL サブスクリプシ�
 | `reality scan` | REALITY ターゲットをプロブ |
 | `vless-encryption on\|off\|status` | VLESS ペイロード暗号化の管理 |
 | `tor on\|off` | エグジットノードの Tor ルーティング (任意) |
-| `reinstall [--branch BRANCH]` | コードをクリーンに再インストールし、状態と現在のブランチを保持 |
+| `reinstall [--commit COMMIT]` | レビュー済みコミットをクリーンに再インストールし、状態を保持 |
 
 ## VLESS 暗号化
 

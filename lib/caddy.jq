@@ -9,7 +9,7 @@ def cdn: cfg.inbound.tls.cdn_domain | ascii_downcase;
 def path: sec.inbound.xhttp_path;
 def hy_enabled: cfg.inbound.hysteria.enabled;
 def hy_domain: cfg.inbound.hysteria.domain | ascii_downcase;
-def hy_masquerade: cfg.inbound.hysteria.masquerade | ascii_downcase;
+def hy_masquerade: cfg.inbound.hysteria.masquerade | ascii_downcase | split(".") | map(@uri) | join(".");
 def tls_enabled: cfg.inbound.mode == "tls" or cfg.inbound.mode == "both";
 def same_domain: tls_enabled and hy_enabled and cdn == hy_domain;
 def needs_l4:

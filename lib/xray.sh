@@ -9,9 +9,7 @@ kokoro_xray_load_paths() {
     geo_dir="$(kokoro_cfg '.paths.geo_dir')"
     xray_config="$(kokoro_cfg '.paths.xray_config')"
 
-    [[ -n "$dest" && "$dest" != "null" ]] || kokoro_die "missing required config path: .paths.xray_bin"
-    [[ -n "$geo_dir" && "$geo_dir" != "null" ]] || kokoro_die "missing required config path: .paths.geo_dir"
-    [[ -n "$xray_config" && "$xray_config" != "null" ]] || kokoro_die "missing required config path: .paths.xray_config"
+    kokoro_validate_service_paths
 }
 
 kokoro_xray_install() {
@@ -43,23 +41,34 @@ kokoro_xray_install() {
 }
 
 kokoro_xray_install_service() {
-    local cfg
+    local cfg unit
+    kokoro_validate_service_paths
     cfg="$(kokoro_cfg '.paths.xray_config')"
     install -d "$(dirname "$cfg")"
-    cat >/etc/systemd/system/xray.service <<EOF
+    unit="$(kokoro_xray_unit_content)"
+    kokoro_install_systemd_unit xray.service "$unit"
+    systemctl daemon-reload
+    systemctl enable xray >/dev/null 2>&1 || true
+}
+
+kokoro_xray_unit_content() {
+    local bin cfg line
+    bin="$(kokoro_cfg '.paths.xray_bin')"
+    cfg="$(kokoro_cfg '.paths.xray_config')"
+    kokoro_validate_service_paths
+    line="ExecStart=${bin} run -config ${cfg}"
+    cat <<EOF
 [Unit]
 Description=Xray Service (kokoro-xray)
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=$(kokoro_cfg '.paths.xray_bin') run -config ${cfg}
+${line}
 Restart=on-failure
 LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl daemon-reload
-    systemctl enable xray >/dev/null 2>&1 || true
 }

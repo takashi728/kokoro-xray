@@ -49,6 +49,7 @@ kokoro_xray_download_release_zip() {
 
 kokoro_geodata_install() {
     local geo_dir zip tmp
+    kokoro_validate_service_paths
     geo_dir="$(kokoro_cfg '.paths.geo_dir')"
     tmp="$(mktemp -d)"
     zip="$(kokoro_xray_download_release_zip "$tmp")"
@@ -61,5 +62,6 @@ kokoro_geodata_install() {
 
 kokoro_geodata_update() {
     kokoro_need_root
+    kokoro_validate_service_paths
     kokoro_geodata_install
 }

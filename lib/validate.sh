@@ -5,6 +5,7 @@ source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_validate_geo() {
     local geo_dir
+    kokoro_validate_service_paths
     geo_dir="$(kokoro_cfg '.paths.geo_dir')"
     if [[ ! -f "${geo_dir}/geoip.dat" || ! -f "${geo_dir}/geosite.dat" ]]; then
         kokoro_warn "missing geoip.dat/geosite.dat in ${geo_dir}"
@@ -15,6 +16,7 @@ kokoro_validate_geo() {
 
 kokoro_validate() {
     local xray_bin cfg caddyfile role
+    kokoro_validate_service_paths
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
     cfg="$(kokoro_cfg '.paths.xray_config')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"

@@ -13,6 +13,7 @@ source "${KOKORO_ROOT}/lib/firewall.sh"
 kokoro_apply() {
     kokoro_need_root
     kokoro_ensure_state
+    kokoro_validate_service_paths
     kokoro_ensure_vless_encryption_keys
     kokoro_ensure_hysteria_secrets
 

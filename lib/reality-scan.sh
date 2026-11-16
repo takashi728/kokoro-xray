@@ -22,25 +22,33 @@ kokoro_reality_normalize_host() {
     h="${h#http://}"
     h="${h%%/*}"
     h="${h%%:*}"
-    printf '%s\n' "$h"
+    printf '%s\n' "${h,,}"
 }
 
 kokoro_reality_cert_covers_host() {
-    local host="$1" san base wildcard
+    local host="$1" san names name prefix suffix matched=false
     san="$(timeout "${KOKORO_REALITY_SCAN_TIMEOUT}" openssl s_client \
         -connect "${host}:443" -servername "$host" </dev/null 2>/dev/null \
         | openssl x509 -noout -ext subjectAltName 2>/dev/null || true)"
     [[ -n "$san" ]] || return 1
-    if [[ "$san" == *"DNS:${host}"* ]]; then
-        return 0
-    fi
-    base="${host#*.}"
-    if [[ "$host" == *.* && "$san" == *"DNS:*.${base}"* ]]; then
-        return 0
-    fi
-    wildcard="*.${base}"
-    [[ "$san" == *"DNS:${wildcard}"* ]] && return 0
-    return 1
+    names="$(printf '%s\n' "$san" | tr ',' '\n' | sed -n 's/^[[:space:]]*DNS:\([^[:space:]]*\).*/\1/p')"
+    while IFS= read -r name; do
+        name="${name,,}"
+        if [[ "$name" == "$host" ]]; then
+            matched=true
+            break
+        fi
+        if [[ "$name" == '*.'* ]]; then
+            suffix="${name#\*.}"
+            prefix="${host%"${suffix}"}"
+            prefix="${prefix%.}"
+            if [[ "$host" == *".${suffix}" && -n "$prefix" && "$prefix" != *.* ]]; then
+                matched=true
+                break
+            fi
+        fi
+    done <<<"$names"
+    [[ "$matched" == "true" ]]
 }
 
 kokoro_reality_bad_redirect() {
@@ -72,8 +80,8 @@ kokoro_reality_validate_one() {
     log="$(mktemp)"
 
     host="$(kokoro_reality_normalize_host "$host")"
-    if [[ -z "$host" ]]; then
-        echo -e "FAIL\t0\t0\tempty"
+    if [[ ! "$host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
+        echo -e "FAIL\t0\t0\tinvalid-host\t${host}"
         return
     fi
 
@@ -186,7 +194,8 @@ kokoro_reality_collect_hosts() {
 kokoro_reality_apply_host() {
     local host="$1"
     host="$(kokoro_reality_normalize_host "$host")"
-    [[ -n "$host" ]] || kokoro_die "empty REALITY host"
+    [[ "$host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] ||
+        kokoro_die "invalid REALITY host: ${host}"
     kokoro_ensure_state
     kokoro_cfg_set_str '.inbound.reality.dest' "${host}:443"
     kokoro_cfg_set '.inbound.reality.server_names' "[\"${host}\"]"
@@ -280,6 +289,10 @@ EOF
     kokoro_need_cmd openssl
     kokoro_need_cmd curl
     kokoro_need_cmd getent
+
+    [[ "$limit" =~ ^[1-9][0-9]*$ ]] || kokoro_die "invalid --limit: ${limit}"
+    [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || kokoro_die "invalid --jobs: ${jobs}"
+    (( jobs <= 32 )) || kokoro_die "--jobs must be <= 32"
 
     local tmp_hosts tmp_out
     tmp_hosts="$(mktemp)"

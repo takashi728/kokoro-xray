@@ -77,7 +77,13 @@ kokoro_dispatch() {
             ;;
         reinstall)
             kokoro_need_root
-            bash "${KOKORO_ROOT}/install.sh" --clean-install "$@"
+            local installed_commit=""
+            if [[ -f "${KOKORO_HOME}/installed-commit" ]]; then
+                installed_commit="$(tr -d '[:space:]' <"${KOKORO_HOME}/installed-commit")"
+            fi
+            [[ "$installed_commit" =~ ^[0-9a-f]{40}$ ]] ||
+                kokoro_die "installed commit is missing; run the reviewed bootstrap installer"
+            bash "${KOKORO_ROOT}/install.sh" --clean-install --commit "$installed_commit" "$@"
             ;;
         *)
             return 1

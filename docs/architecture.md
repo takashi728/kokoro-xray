@@ -21,6 +21,12 @@
 preflight.sh → render.jq + caddy.jq → validate.sh → firewall.sh → reload.sh
 ```
 
+Service executables and configuration locations are fixed canonical system
+paths. Preflight rejects unsafe or non-canonical values before either Xray or
+Caddy can execute them. Hysteria2 certificate and key paths must resolve to
+root-owned, non-writable regular files beneath the Caddy certificate root.
+Generated systemd units are syntax-safe and verified before installation.
+
 ## Inbound modes
 
 | Mode | REALITY | TLS/CDN | :443 owner |

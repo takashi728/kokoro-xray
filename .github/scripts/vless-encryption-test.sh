@@ -29,7 +29,7 @@ jq --arg bin "$fake_xray" '.role = "edge" | .paths.xray_bin = $bin' \
     "${state}/config.json" >"${state}/config.tmp"
 mv "${state}/config.tmp" "${state}/config.json"
 
-HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
+HOME="$tmp_home" KOKORO_ROOT="$ROOT" KOKORO_TEST_PATH_ROOT="$tmp_home" bash <<'SCRIPT'
 set -euo pipefail
 source "${KOKORO_ROOT}/lib/keys.sh"
 kokoro_gen_vless_encryption_keys

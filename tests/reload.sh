@@ -7,9 +7,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 state="${TMP}/.kokoro-xray"
 unit_dir="${TMP}/units"
-install -d -m 700 "$state" "$unit_dir"
+cert_root="${TMP}/certificates"
+install -d -m 700 "$state" "$unit_dir" "${cert_root}/issuer/example.com"
 
-jq --arg cert "${TMP}/cert.pem" --arg key "${TMP}/key.pem" '
+jq --arg cert "${cert_root}/issuer/example.com/example.com.crt" \
+   --arg key "${cert_root}/issuer/example.com/example.com.key" '
   .role = "edge"
   | .inbound.mode = "both"
   | .inbound.tls.cdn_domain = "edge.example.com"
@@ -20,9 +22,11 @@ jq --arg cert "${TMP}/cert.pem" --arg key "${TMP}/key.pem" '
   | .paths.hysteria_key = $key
 ' "$ROOT/config.defaults.json" >"${state}/config.json"
 cp "$ROOT/secrets.defaults.json" "${state}/secrets.json"
-touch "${TMP}/cert.pem" "${TMP}/key.pem"
+touch "${cert_root}/issuer/example.com/example.com.crt" \
+      "${cert_root}/issuer/example.com/example.com.key"
 
-HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_SYSTEMD_UNIT_DIR="$unit_dir" bash -c '
+HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_TEST_HYSTERIA_CERT_ROOT="$cert_root" \
+    KOKORO_TEST_SYSTEMD_UNIT_DIR="$unit_dir" bash -c '
   set -euo pipefail
   source "${KOKORO_ROOT}/lib/reload.sh"
   systemctl() {
@@ -36,13 +40,14 @@ service_unit="${unit_dir}/kokoro-hysteria-cert-reload.service"
 [[ -f "$path_unit" && -f "$service_unit" ]]
 [[ "$(stat -c '%a' "$path_unit")" == "644" ]]
 [[ "$(stat -c '%a' "$service_unit")" == "644" ]]
-grep -qx "PathChanged=${TMP}/cert.pem" "$path_unit"
-grep -qx "PathChanged=${TMP}/key.pem" "$path_unit"
+grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.crt" "$path_unit"
+grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.key" "$path_unit"
 grep -qx 'Unit=kokoro-hysteria-cert-reload.service' "$path_unit"
 grep -qx 'ExecStart=/usr/bin/systemctl restart xray.service' "$service_unit"
 grep -qx 'enable --now kokoro-hysteria-cert.path' "${TMP}/systemctl.log"
 
-HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_SYSTEMD_UNIT_DIR="$unit_dir" bash -c '
+HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_TEST_HYSTERIA_CERT_ROOT="$cert_root" \
+    KOKORO_TEST_SYSTEMD_UNIT_DIR="$unit_dir" bash -c '
   set -euo pipefail
   source "${KOKORO_ROOT}/lib/reload.sh"
   kokoro_cfg() {

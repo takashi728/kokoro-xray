@@ -27,9 +27,20 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 
 ## Install
 
+Download the installer from an immutable, reviewed commit. Replace
+`<reviewed-commit>` with the full 40-character SHA recorded for the release you
+want to deploy, then pass the same SHA to the bootstrap:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
+commit=<reviewed-commit>
+curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
+    -o /tmp/kokoro-install.sh
+sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
 ```
+
+The installer has no fallback commit. It verifies the staged repository is
+exactly the supplied commit before replacing the live installation, and a
+mismatch aborts before activation.
 
 Set up an edge:
 
@@ -45,10 +56,10 @@ sudo kokoro-xray exit
 
 ## Update
 
-Normal update keeps existing state:
+Normal update keeps existing state. Download and run a newly reviewed
+immutable bootstrap shown in **Install**, then run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/takashi728/kokoro-xray/codebase-redesign-with-func/install.sh | sudo bash
 sudo kokoro-xray apply
 ```
 
@@ -58,6 +69,11 @@ Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 sudo kokoro-xray reinstall
 sudo kokoro-xray apply
 ```
+
+Installations created before commit pinning have no
+`~/.kokoro-xray/installed-commit`. Rerun the pinned bootstrap once before using
+`reinstall`; the bootstrap records the trusted revision without changing node
+state.
 
 ## Basic Flow
 
@@ -147,7 +163,7 @@ detection.
 | `reality scan` | Probe REALITY targets |
 | `vless-encryption on\|off\|status` | Manage VLESS payload encryption |
 | `tor on\|off` | Optional exit-node Tor routing |
-| `reinstall [--branch BRANCH]` | Clean reinstall code, keep state and current branch |
+| `reinstall [--commit COMMIT]` | Clean reinstall the reviewed commit, keep state |
 
 ## VLESS Encryption
 

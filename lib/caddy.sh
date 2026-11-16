@@ -221,6 +221,7 @@ kokoro_go_for_caddy() {
 kokoro_caddy_install() {
     local dest caddy_version go_bin go_path staged
     kokoro_need_root
+    kokoro_validate_service_paths
     dest="$(kokoro_cfg '.paths.caddy_bin')"
     caddy_version="$(kokoro_caddy_version)"
 
@@ -268,11 +269,38 @@ kokoro_caddy_install() {
 }
 
 kokoro_caddy_install_service() {
-    local caddy_bin caddyfile
+    local caddy_bin caddyfile unit
+    kokoro_validate_service_paths
     caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
     install -d "$(dirname "$caddyfile")"
-    cat >/etc/systemd/system/caddy.service <<EOF
+    unit="[Unit]
+Description=Caddy Service (kokoro-xray)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+Environment=HOME=/var/lib/kokoro-caddy
+ExecStart=${caddy_bin} run --environ --config ${caddyfile}
+ExecReload=${caddy_bin} reload --config ${caddyfile} --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target"
+    kokoro_install_systemd_unit caddy.service "$unit"
+    systemctl daemon-reload
+    systemctl enable caddy >/dev/null 2>&1 || true
+}
+
+kokoro_caddy_unit_content() {
+    local caddy_bin caddyfile
+    kokoro_validate_service_paths
+    caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
+    caddyfile="$(kokoro_cfg '.paths.caddyfile')"
+    cat <<EOF
 [Unit]
 Description=Caddy Service (kokoro-xray)
 After=network-online.target
@@ -290,18 +318,19 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl daemon-reload
-    systemctl enable caddy >/dev/null 2>&1 || true
 }
 
 kokoro_hysteria_prepare_certificate() {
     [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
 
-    local domain cert key i mode caddy_bin caddyfile stopped_xray=false
+    local domain cert key i mode caddy_bin caddyfile stopped_xray=false cert_root
+    local canonical_cert canonical_key cert_mode key_mode
+    kokoro_validate_service_paths
     domain="$(kokoro_cfg '.inbound.hysteria.domain' | tr '[:upper:]' '[:lower:]')"
     mode="$(kokoro_cfg '.inbound.mode')"
     caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
+    cert_root="$(realpath -m -- "$(kokoro_hysteria_cert_root)")"
     install -d -m 700 /var/lib/kokoro-caddy
     kokoro_render_caddy
     "$caddy_bin" validate --config "$caddyfile" ||
@@ -319,11 +348,23 @@ kokoro_hysteria_prepare_certificate() {
 
     kokoro_log "waiting for Let's Encrypt certificate: ${domain}"
     for i in $(seq 1 90); do
-        cert="$(find /var/lib/kokoro-caddy/certificates -type f -path "*/${domain}/${domain}.crt" -print -quit 2>/dev/null)"
-        key="$(find /var/lib/kokoro-caddy/certificates -type f -path "*/${domain}/${domain}.key" -print -quit 2>/dev/null)"
+        cert="$(find "$cert_root" -type f -name "${domain}.crt" -print -quit 2>/dev/null)"
+        key="$(find "$cert_root" -type f -name "${domain}.key" -print -quit 2>/dev/null)"
         if [[ -n "$cert" && -n "$key" ]] && openssl x509 -checkend 3600 -noout -in "$cert" >/dev/null 2>&1; then
-            kokoro_cfg_set_str '.paths.hysteria_cert' "$cert"
-            kokoro_cfg_set_str '.paths.hysteria_key' "$key"
+            canonical_cert="$(realpath -e -- "$cert")"
+            canonical_key="$(realpath -e -- "$key")"
+            [[ "$canonical_cert" == "${cert_root}/"* && "$canonical_key" == "${cert_root}/"* ]] ||
+                continue
+            [[ "$(stat -c '%u' "$canonical_cert")" == "0" &&
+               "$(stat -c '%u' "$canonical_key")" == "0" ]] ||
+                continue
+            cert_mode="$(stat -c '%a' "$canonical_cert")"
+            key_mode="$(stat -c '%a' "$canonical_key")"
+            (( (8#${cert_mode} & 8#022) == 0 &&
+               (8#${key_mode} & 8#022) == 0 )) ||
+                continue
+            kokoro_cfg_set_str '.paths.hysteria_cert' "$canonical_cert"
+            kokoro_cfg_set_str '.paths.hysteria_key' "$canonical_key"
             kokoro_log "Hysteria2 certificate ready"
             return 0
         fi

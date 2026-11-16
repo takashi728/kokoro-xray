@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install jq
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap jq
       - name: Run render tests
         run: bash .github/scripts/render-test.sh
       - name: Run download verification tests
@@ -41,6 +41,10 @@ jobs:
         run: bash .github/scripts/state-test.sh
       - name: Run reload tests
         run: bash tests/reload.sh
+      - name: Run audit remediation tests
+        run: |
+          bash tests/security.sh
+          bash tests/installer.sh
       - name: Install pinned Xray
         run: |
           mkdir -p /tmp/kokoro-xray-ci
