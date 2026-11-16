@@ -7,6 +7,7 @@ tmp_home="$(mktemp -d)"
 install -d -m 700 "${tmp_home}/.kokoro-xray"
 cp "${FIX}/edge-config.json" "${tmp_home}/.kokoro-xray/config.json"
 cp "${FIX}/edge-secrets.json" "${tmp_home}/.kokoro-xray/secrets.json"
+export KOKORO_PUBLIC_ADDRESS=203.0.113.10
 
 HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
 set -euo pipefail
@@ -21,6 +22,25 @@ reality="$(kokoro_link_reality_url | tr -d '\n')"
 [[ "$reality" == *"type=xhttp"* ]]
 [[ "$reality" == *"pbk=${expected_pbk}"* ]]
 [[ "$reality" == *"encryption=${expected_encryption}"* ]]
+[[ "$reality" == *"@203.0.113.10:443"* ]]
+
+reality_json="$(kokoro_link_show --json reality)"
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].tag == "kokoro-reality"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].settings.vnext[0].address == "203.0.113.10"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.network == "xhttp"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.security == "reality"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.realitySettings.serverName == "www.cloudflare.com"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e --arg key "$expected_pbk" '.outbounds[0].streamSettings.realitySettings.publicKey == $key' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.realitySettings.shortId == "0123abcd"' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.path | startswith("/")' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings == {path:.outbounds[0].streamSettings.xhttpSettings.path}' >/dev/null
+printf '%s\n' "$reality_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
+printf '%s\n' "$reality_json" | jq -e '.routing.rules[-1].outboundTag == "kokoro-reality"' >/dev/null
+
+if command -v xray >/dev/null 2>&1; then
+    printf '%s\n' "$reality_json" >"${HOME}/.kokoro-xray/client-reality.json"
+    xray run -test -config "${HOME}/.kokoro-xray/client-reality.json"
+fi
 
 tls="$(kokoro_link_tls_url | tr -d '\n')"
 [[ "$tls" == vless://* ]]

@@ -12,6 +12,14 @@ kokoro_link_vless_encryption() {
     fi
 }
 
+kokoro_link_public_address() {
+    if [[ -n "${KOKORO_PUBLIC_ADDRESS:-}" ]]; then
+        printf '%s\n' "$KOKORO_PUBLIC_ADDRESS"
+        return 0
+    fi
+    curl -4 -fsS --max-time 5 ifconfig.me 2>/dev/null || printf 'YOUR_VPS_IP\n'
+}
+
 kokoro_link_tls_url() {
     kokoro_ensure_state
     local uuid path mode cdn encryption
@@ -37,7 +45,7 @@ kokoro_link_reality_url() {
     pub="$(kokoro_sec '.inbound.reality.public_key')"
     sid="$(kokoro_sec '.inbound.reality.short_ids[0]')"
     encryption="$(kokoro_link_vless_encryption)"
-    host="$(curl -4 -s ifconfig.me 2>/dev/null || echo 'YOUR_VPS_IP')"
+    host="$(kokoro_link_public_address)"
     printf 'vless://%s@%s:443?encryption=%s&security=reality&type=xhttp&path=%s&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-reality\n' \
         "$uuid" "$host" "$encryption" "$path" "$pub" "$sni" "$sid"
 }
@@ -157,6 +165,211 @@ kokoro_link_hysteria_json() {
         }'
 }
 
+kokoro_link_xhttp_json() {
+    local address="$1" tag="$2" security="$3" server_name="$4"
+    local public_key="$5" short_id="$6" path="$7" uuid="$8" encryption="$9"
+
+    jq -n \
+        --arg address "$address" \
+        --arg tag "$tag" \
+        --arg security "$security" \
+        --arg server_name "$server_name" \
+        --arg public_key "$public_key" \
+        --arg short_id "$short_id" \
+        --arg path "$path" \
+        --arg uuid "$uuid" \
+        --arg encryption "$encryption" \
+        '
+          def xhttp_settings:
+            if $security == "tls" then
+              {
+                path: $path,
+                host: $server_name,
+                mode: "auto",
+                xmux: {
+                  maxConcurrency: "5-10",
+                  hMaxRequestTimes: "600-900",
+                  hMaxReusableSecs: "1800-3000"
+                },
+                xPaddingKey: "v",
+                xPaddingBytes: "16-96",
+                xPaddingHeader: "Referer",
+                xPaddingMethod: "tokenish",
+                uplinkHTTPMethod: "POST",
+                xPaddingObfsMode: true,
+                xPaddingPlacement: "queryInHeader",
+                scMaxEachPostBytes: 2000000,
+                uplinkDataPlacement: "body",
+                scMinPostsIntervalMs: 10
+              }
+            elif $security == "reality" then
+              {path: $path}
+            else
+              error("unsupported XHTTP client security: \($security)")
+            end;
+
+          def stream_settings:
+            if $security == "tls" then
+              {
+                network: "xhttp",
+                security: "tls",
+                tlsSettings: {
+                  serverName: $server_name,
+                  fingerprint: "chrome",
+                  alpn: ["h2"]
+                },
+                xhttpSettings: xhttp_settings
+              }
+            elif $security == "reality" then
+              {
+                network: "xhttp",
+                security: "reality",
+                realitySettings: {
+                  serverName: $server_name,
+                  fingerprint: "chrome",
+                  publicKey: $public_key,
+                  shortId: $short_id,
+                  spiderX: "/"
+                },
+                xhttpSettings: xhttp_settings
+              }
+            else
+              error("unsupported XHTTP client security: \($security)")
+            end;
+
+          def routing_rules: [
+            {
+              type: "field",
+              domain: ["geosite:category-ads-all"],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              domain: [
+                "domain:dns.google",
+                "domain:dns.google.com",
+                "domain:doh.google",
+                "domain:google-public-dns-a.google.com",
+                "domain:google-public-dns-b.google.com"
+              ],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              ip: [
+                "8.8.8.8",
+                "8.8.4.4",
+                "2001:4860:4860::8888",
+                "2001:4860:4860::8844"
+              ],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              domain: [
+                "geosite:google",
+                "geosite:youtube",
+                "domain:gmail.com",
+                "domain:gemini.google.com",
+                "domain:gemini.google",
+                "domain:googleapis.cn",
+                "domain:googleapis-cn.com",
+                "domain:gstatic.cn",
+                "domain:gstatic-cn.com"
+              ],
+              outboundTag: $tag
+            },
+            {
+              type: "field",
+              ip: ["geoip:private"],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              domain: ["geosite:private"],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              domain: [
+                "geosite:cn",
+                "geosite:geolocation-cn",
+                "regexp:.*\\.ru$",
+                "regexp:.*\\.su$",
+                "regexp:.*\\.xn--p1ai$"
+              ],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              ip: ["geoip:cn"],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              ip: ["geoip:ru"],
+              outboundTag: "BLOCK"
+            },
+            {
+              type: "field",
+              network: "tcp,udp",
+              outboundTag: $tag
+            }
+          ];
+
+          {
+            log: { loglevel: "warning" },
+            dns: {
+              servers: ["https://cloudflare-dns.com/dns-query"],
+              queryStrategy: "UseIP"
+            },
+            inbounds: [
+              {
+                tag: "socks-in",
+                listen: "127.0.0.1",
+                port: 10808,
+                protocol: "socks",
+                settings: { udp: true }
+              },
+              {
+                tag: "http-in",
+                listen: "127.0.0.1",
+                port: 10809,
+                protocol: "http"
+              }
+            ],
+            outbounds: [
+              {
+                tag: $tag,
+                protocol: "vless",
+                settings: {
+                  vnext: [
+                    {
+                      address: $address,
+                      port: 443,
+                      users: [
+                        {
+                          id: $uuid,
+                          encryption: $encryption,
+                          flow: ""
+                        }
+                      ]
+                    }
+                  ]
+                },
+                streamSettings: stream_settings
+              },
+              { tag: "DIRECT", protocol: "freedom" },
+              { tag: "BLOCK", protocol: "blackhole" }
+            ],
+            routing: {
+              domainStrategy: "IPIfNonMatch",
+              rules: routing_rules
+            }
+          }
+        '
+}
+
 kokoro_link_tls_json() {
     kokoro_ensure_state
     local uuid path mode cdn encryption
@@ -168,167 +381,27 @@ kokoro_link_tls_json() {
     encryption="$(kokoro_link_vless_encryption)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 1
 
-    jq -n \
-        --arg uuid "$uuid" \
-        --arg path "$path" \
-        --arg cdn "$cdn" \
-        --arg encryption "$encryption" \
-        '{
-          log: { loglevel: "warning" },
-          dns: {
-            servers: ["https://cloudflare-dns.com/dns-query"],
-            queryStrategy: "UseIP"
-          },
-          inbounds: [
-            {
-              tag: "socks-in",
-              listen: "127.0.0.1",
-              port: 10808,
-              protocol: "socks",
-              settings: { udp: true }
-            },
-            {
-              tag: "http-in",
-              listen: "127.0.0.1",
-              port: 10809,
-              protocol: "http"
-            }
-          ],
-          outbounds: [
-            {
-              tag: "kokoro-tls",
-              protocol: "vless",
-              settings: {
-                vnext: [
-                  {
-                    address: $cdn,
-                    port: 443,
-                    users: [
-                      {
-                        id: $uuid,
-                        encryption: $encryption,
-                        flow: ""
-                      }
-                    ]
-                  }
-                ]
-              },
-              streamSettings: {
-                network: "xhttp",
-                security: "tls",
-                tlsSettings: {
-                  serverName: $cdn,
-                  fingerprint: "chrome",
-                  alpn: ["h2"]
-                },
-                xhttpSettings: {
-                  path: $path,
-                  host: $cdn,
-                  mode: "auto",
-                  xmux: {
-                    maxConcurrency: "5-10",
-                    hMaxRequestTimes: "600-900",
-                    hMaxReusableSecs: "1800-3000"
-                  },
-                  xPaddingKey: "v",
-                  xPaddingBytes: "16-96",
-                  xPaddingHeader: "Referer",
-                  xPaddingMethod: "tokenish",
-                  uplinkHTTPMethod: "POST",
-                  xPaddingObfsMode: true,
-                  xPaddingPlacement: "queryInHeader",
-                  scMaxEachPostBytes: 2000000,
-                  uplinkDataPlacement: "body",
-                  scMinPostsIntervalMs: 10
-                }
-              }
-            },
-            { tag: "DIRECT", protocol: "freedom" },
-            { tag: "BLOCK", protocol: "blackhole" }
-          ],
-          routing: {
-            domainStrategy: "IPIfNonMatch",
-            rules: [
-              {
-                type: "field",
-                domain: ["geosite:category-ads-all"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                domain: [
-                  "domain:dns.google",
-                  "domain:dns.google.com",
-                  "domain:doh.google",
-                  "domain:google-public-dns-a.google.com",
-                  "domain:google-public-dns-b.google.com"
-                ],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                ip: [
-                  "8.8.8.8",
-                  "8.8.4.4",
-                  "2001:4860:4860::8888",
-                  "2001:4860:4860::8844"
-                ],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                domain: [
-                  "geosite:google",
-                  "geosite:youtube",
-                  "domain:gmail.com",
-                  "domain:gemini.google.com",
-                  "domain:gemini.google",
-                  "domain:googleapis.cn",
-                  "domain:googleapis-cn.com",
-                  "domain:gstatic.cn",
-                  "domain:gstatic-cn.com"
-                ],
-                outboundTag: "kokoro-tls"
-              },
-              {
-                type: "field",
-                ip: ["geoip:private"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                domain: ["geosite:private"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                domain: [
-                  "geosite:cn",
-                  "geosite:geolocation-cn",
-                  "regexp:.*\\.ru$",
-                  "regexp:.*\\.su$",
-                  "regexp:.*\\.xn--p1ai$"
-                ],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                ip: ["geoip:cn"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                ip: ["geoip:ru"],
-                outboundTag: "BLOCK"
-              },
-              {
-                type: "field",
-                network: "tcp,udp",
-                outboundTag: "kokoro-tls"
-              }
-            ]
-          }
-        }'
+    kokoro_link_xhttp_json "$cdn" "kokoro-tls" "tls" "$cdn" "" "" \
+        "$path" "$uuid" "$encryption"
+}
+
+kokoro_link_reality_json() {
+    kokoro_ensure_state
+    local uuid path mode sni public_key short_id encryption address
+    mode="$(kokoro_cfg '.inbound.mode')"
+    [[ "$mode" == "reality" || "$mode" == "both" ]] || return 1
+    uuid="$(kokoro_sec '.inbound.uuid')"
+    path="$(kokoro_sec '.inbound.xhttp_path')"
+    sni="$(kokoro_cfg '.inbound.reality.server_names[0]')"
+    public_key="$(kokoro_sec '.inbound.reality.public_key')"
+    short_id="$(kokoro_sec '.inbound.reality.short_ids[0]')"
+    encryption="$(kokoro_link_vless_encryption)"
+    address="$(kokoro_link_public_address)"
+    [[ -n "$uuid" && -n "$path" && -n "$sni" && -n "$public_key" && -n "$short_id" ]] ||
+        return 1
+
+    kokoro_link_xhttp_json "$address" "kokoro-reality" "reality" "$sni" \
+        "$public_key" "$short_id" "$path" "$uuid" "$encryption"
 }
 
 kokoro_link_qr_ensure() {
@@ -360,8 +433,8 @@ kokoro_link_show() {
             --qr) show_qr=true; shift ;;
             --json)
                 if [[ $# -ge 2 && "${2:-}" != -* ]]; then
-                    [[ "$2" == "tls" || "$2" == "hysteria" ]] ||
-                        kokoro_die "unknown JSON profile: $2 (expected tls or hysteria)"
+                    [[ "$2" == "tls" || "$2" == "reality" || "$2" == "hysteria" ]] ||
+                        kokoro_die "unknown JSON profile: $2 (expected tls, reality, or hysteria)"
                     json_profile="$2"
                     shift 2
                 else
@@ -376,11 +449,12 @@ kokoro-xray link — proxy share URLs
 Usage:
   kokoro-xray link
   kokoro-xray link --qr
-  kokoro-xray link --json [tls|hysteria]
+  kokoro-xray link --json [tls|reality|hysteria]
 
 Options:
   --qr                    Print terminal QR codes (requires qrencode)
-  --json [tls|hysteria]   Print a full Xray client JSON profile
+  --json [tls|reality|hysteria]
+                          Print a full Xray client JSON profile
 EOF
                 return 0
                 ;;
@@ -392,6 +466,11 @@ EOF
         tls)
             kokoro_link_tls_json ||
                 kokoro_die "tls profile is unavailable for current mode"
+            return 0
+            ;;
+        reality)
+            kokoro_link_reality_json ||
+                kokoro_die "reality profile is unavailable for current mode"
             return 0
             ;;
         hysteria)

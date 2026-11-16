@@ -118,6 +118,17 @@ kokoro-xray link --json tls
 Use JSON export for TLS mode when the client app does not preserve advanced
 XHTTP settings from URL subscriptions. Use a current Xray client.
 
+VLESS XHTTP REALITY JSON export:
+
+```bash
+kokoro-xray link --json reality
+```
+
+The REALITY JSON profile uses the server's public IPv4 address, the configured
+REALITY SNI, public key, short ID, XHTTP path, and the same XHTTP client tuning
+as the TLS profile. Set `KOKORO_PUBLIC_ADDRESS` to override public-address
+detection.
+
 ## Commands
 
 | Command | Description |
@@ -126,7 +137,7 @@ XHTTP settings from URL subscriptions. Use a current Xray client.
 | `exit [--keep-secrets]` | Install or update exit node |
 | `apply` | Render, validate, and reload services |
 | `pair` | Exchange edge/exit WireGuard peer info |
-| `link [--json tls\|hysteria]` | Print client links or an Xray JSON profile |
+| `link [--json tls\|reality\|hysteria]` | Print client links or an Xray JSON profile |
 | `status` | Show service and config status |
 | `validate` | Validate rendered configs |
 | `geodata` | Update geo data files |
