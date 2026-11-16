@@ -36,7 +36,11 @@ Hysteria2 is an optional parallel UDP inbound, not another XHTTP mode. Xray
 listens on its configured UDP port list. Caddy manages the public certificate,
 serves the same domain over TCP, and disables its own HTTP/3 listener to avoid
 contending for UDP `443`. REALITY-only mode moves behind Caddy L4 when
-Hysteria2 is enabled so both domains can keep TCP `443`.
+Hysteria2 is enabled so both domains can keep TCP `443`. The Hysteria2 direct
+domain may also be the TLS XHTTP CDN domain; Caddy then sends the XHTTP path to
+loopback Xray TLS and all other requests to the masquerade. A systemd path unit
+restarts Xray after Caddy renews the certificate because Xray loads that
+certificate only at startup.
 
 ## VLESS Encryption
 

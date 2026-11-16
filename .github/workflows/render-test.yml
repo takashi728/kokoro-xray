@@ -39,6 +39,8 @@ jobs:
         run: bash .github/scripts/source-path-test.sh
       - name: Run state tests
         run: bash .github/scripts/state-test.sh
+      - name: Run reload tests
+        run: bash tests/reload.sh
       - name: Install pinned Xray
         run: |
           mkdir -p /tmp/kokoro-xray-ci

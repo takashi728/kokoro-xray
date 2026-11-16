@@ -78,6 +78,7 @@ kokoro_cfg_set() {
     tmp="$(mktemp)"
     jq "$1 = $2" "${KOKORO_CONFIG}" >"$tmp"
     mv "$tmp" "${KOKORO_CONFIG}"
+    chmod 644 "${KOKORO_CONFIG}"
     kokoro_state_refresh_cfg
 }
 
@@ -86,6 +87,7 @@ kokoro_cfg_set_str() {
     tmp="$(mktemp)"
     jq --arg v "$2" "$1 = \$v" "${KOKORO_CONFIG}" >"$tmp"
     mv "$tmp" "${KOKORO_CONFIG}"
+    chmod 644 "${KOKORO_CONFIG}"
     kokoro_state_refresh_cfg
 }
 

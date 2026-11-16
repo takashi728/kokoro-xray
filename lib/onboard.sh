@@ -17,6 +17,7 @@ kokoro_onboard_edge() {
 
     if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
         read -r -p "CDN domain (e.g. cdn.example.com): " cdn
+        cdn="${cdn,,}"
         [[ -n "$cdn" ]] && kokoro_cfg_set_str '.inbound.tls.cdn_domain' "$cdn"
         read -r -p "ACME email: " email
         [[ -n "$email" ]] && kokoro_cfg_set_str '.inbound.tls.acme_email' "$email"

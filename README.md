@@ -99,6 +99,8 @@ with standard Salamander obfuscation. It includes the `mport` parameter used by
 v2rayN and the `port`/`mportHopInt` parameters used by Happ, without placing a
 port range in the hostname. Its domain must point directly to the VPS.
 Cloudflare's ordinary CDN proxy does not carry Hysteria2 UDP traffic.
+It may be the same direct domain used by TLS XHTTP; Caddy keeps those TCP and
+UDP services on their separate paths and protocols.
 
 Use the Xray JSON export when the client supports JSON import and should use
 the full UDP hopping range:
@@ -160,6 +162,7 @@ Run `sudo kokoro-xray edge` and enable Hysteria2 during onboarding. It runs in
 parallel with the selected VLESS mode and defaults to:
 
 - Real Let's Encrypt certificate managed by Caddy
+- Automatic Xray restart after Caddy renews that certificate
 - UDP port hopping across `443,20000-20020`
 - Salamander packet obfuscation (upstream's Gecko mode is not enabled)
 - BBR with the aggressive profile

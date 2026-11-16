@@ -48,6 +48,7 @@ kokoro_migrate() {
         jq '.firewall = {"enabled": true, "ssh_port": 0, "extra_allow": []}' \
             "${KOKORO_CONFIG}" >"$tmp"
         mv "$tmp" "${KOKORO_CONFIG}"
+        chmod 644 "${KOKORO_CONFIG}"
     fi
 }
 
@@ -128,5 +129,6 @@ kokoro_migrate_v010_to_v020() {
             | .inbound.tls.acme_email //= ""' \
             "${KOKORO_CONFIG}" >"$tmp"
         mv "$tmp" "${KOKORO_CONFIG}"
+        chmod 644 "${KOKORO_CONFIG}"
     fi
 }

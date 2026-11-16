@@ -97,8 +97,6 @@ kokoro_preflight_hysteria() {
     [[ "$masquerade" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] ||
         kokoro_die "invalid Hysteria2 masquerade domain: $masquerade"
     [[ "$domain" != "$masquerade" ]] || kokoro_die "Hysteria2 masquerade must be a different domain"
-    [[ -z "$cdn" || "$cdn" == "null" || "$domain" != "${cdn,,}" ]] ||
-        kokoro_die "Hysteria2 needs a DNS-only domain separate from the CDN domain"
     [[ "$ports" == *,* || "$ports" == *-* ]] || kokoro_die "Hysteria2 port hopping requires multiple UDP ports"
 
     IFS=',' read -ra items <<<"$ports"

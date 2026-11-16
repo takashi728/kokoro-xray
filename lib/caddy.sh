@@ -280,6 +280,7 @@ Wants=network-online.target
 
 [Service]
 Type=notify
+Environment=HOME=/var/lib/kokoro-caddy
 ExecStart=${caddy_bin} run --environ --config ${caddyfile}
 ExecReload=${caddy_bin} reload --config ${caddyfile} --force
 TimeoutStopSec=5s

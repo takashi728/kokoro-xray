@@ -33,5 +33,7 @@ kokoro_cfg '.inbound.reality.server_names' | grep -q 'www.cloudflare.com'
 # file actually written
 [[ "$(jq -r '.inbound.mode' "${HOME}/.kokoro-xray/config.json")" == "reality" ]]
 [[ "$(jq -r '.static_proxy.username' "${HOME}/.kokoro-xray/secrets.json")" == "user1" ]]
+[[ "$(stat -c '%a' "${HOME}/.kokoro-xray/config.json")" == "644" ]]
+[[ "$(stat -c '%a' "${HOME}/.kokoro-xray/secrets.json")" == "600" ]]
 
 echo "state-test OK"

@@ -51,6 +51,25 @@ jq -e '
 grep -q 'protocols h1 h2' "$TMP/Caddyfile"
 ! grep -q 'protocols.*h3' "$TMP/Caddyfile"
 
+# TLS and Hysteria2 may share one direct domain. The XHTTP path must still go
+# to the loopback TLS inbound, while other requests reach the masquerade.
+jq '.inbound.mode = "both"
+    | .inbound.tls.cdn_domain = "hy.example.com"' "$TMP/config.json" >"$TMP/same-domain-config.json"
+jq -n -r -f "$ROOT/lib/caddy.jq" \
+    --slurpfile cfg "$TMP/same-domain-config.json" \
+    --slurpfile sec "$TMP/secrets.json" >"$TMP/Caddyfile.same"
+[[ "$(grep -c '^hy.example.com {' "$TMP/Caddyfile.same")" -eq 1 ]]
+tls_line="$(grep -n 'reverse_proxy 127.0.0.1:8444' "$TMP/Caddyfile.same" | cut -d: -f1)"
+masquerade_line="$(grep -n 'reverse_proxy https://www.cloudflare.com' "$TMP/Caddyfile.same" | cut -d: -f1)"
+[[ -n "$tls_line" && -n "$masquerade_line" && "$tls_line" -lt "$masquerade_line" ]]
+
+jq '.inbound.mode = "both"
+    | .inbound.tls.cdn_domain = "HY.EXAMPLE.COM"' "$TMP/config.json" >"$TMP/uppercase-config.json"
+jq -n -r -f "$ROOT/lib/caddy.jq" \
+    --slurpfile cfg "$TMP/uppercase-config.json" \
+    --slurpfile sec "$TMP/secrets.json" >"$TMP/Caddyfile.uppercase"
+[[ "$(grep -c '^hy.example.com {' "$TMP/Caddyfile.uppercase")" -eq 1 ]]
+
 mkdir -p "$TMP/.kokoro-xray"
 cp "$TMP/config.json" "$TMP/.kokoro-xray/config.json"
 cp "$TMP/secrets.json" "$TMP/.kokoro-xray/secrets.json"

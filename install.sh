@@ -199,8 +199,8 @@ log "installed to ${INSTALL_DIR}"
 log "run: kokoro-xray"
 
 run_installed() {
-    if [[ ! -t 0 && -r /dev/tty ]]; then
-        exec "$@" </dev/tty
+    if [[ ! -t 0 ]] && exec 3</dev/tty 2>/dev/null; then
+        exec "$@" <&3 3<&-
     fi
     exec "$@"
 }
