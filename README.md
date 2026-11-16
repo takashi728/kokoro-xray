@@ -27,20 +27,19 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 
 ## Install
 
-Download the installer from an immutable, reviewed commit. Replace
-`<reviewed-commit>` with the full 40-character SHA recorded for the release you
-want to deploy, then pass the same SHA to the bootstrap:
+The reviewed installer commit is
+`b93c64b93550293e614086eaacca0f6bfeff651a`. Download the bootstrap from that
+immutable revision and pass the same SHA to it:
 
 ```bash
-commit=<reviewed-commit>
+commit=b93c64b93550293e614086eaacca0f6bfeff651a
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
 ```
 
-The installer has no fallback commit. It verifies the staged repository is
-exactly the supplied commit before replacing the live installation, and a
-mismatch aborts before activation.
+The installer verifies the staged repository is exactly that commit before
+replacing the live installation. A mismatch aborts before activation.
 
 Set up an edge:
 

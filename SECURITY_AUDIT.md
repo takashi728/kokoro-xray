@@ -2,7 +2,8 @@
 
 Date: 2026-11-17
 
-Scope: repository at `feature/upstream-security-2026-11` (`770ab68`)
+Scope: repository at `feature/upstream-security-2026-11` (`770ab68`); fixes
+landed in `b93c64b93550293e614086eaacca0f6bfeff651a`.
 
 Method: source review, focused adversarial reproduction, shell syntax checks, and the repository test suite.
 

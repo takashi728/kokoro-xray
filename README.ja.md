@@ -27,20 +27,20 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 
 ## インストール
 
-導入するリリースで記録した 40 文字の完全な SHA を
-`<reviewed-commit>` に置き換え、不変のレビュー済みコミットから
-インストーラーを取得して、同じ SHA をブートストラップに渡すにゃ:
+レビュー済みのインストーラーコミットは
+`b93c64b93550293e614086eaacca0f6bfeff651a` にゃ。この不変リビジョンから
+ブートストラップを取得し、同じ SHA をブートストラップに渡すにゃ:
 
 ```bash
-commit=<reviewed-commit>
+commit=b93c64b93550293e614086eaacca0f6bfeff651a
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
 ```
 
-インストーラーにはフォールバックのコミットがないにゃ。実インストールを
-置き換える前に、ステージ済みリポジトリが指定したコミットと完全に一致することを
-検証し、一致しなければ起動前に中止するにゃ。
+インストーラーは、実インストールを置き換える前に、ステージ済みリポジトリが
+このコミットと完全に一致することを検証するにゃ。一致しなければ起動前に
+中止するにゃ。
 
 エッジをセットアップにゃ:
 
