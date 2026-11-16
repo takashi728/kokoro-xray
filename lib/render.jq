@@ -20,7 +20,8 @@ def policy_block: {
 
 def reality_listen: if mode == "reality" and (hysteria_enabled | not) then "0.0.0.0" else "127.0.0.1" end;
 def reality_port: if mode == "reality" and (hysteria_enabled | not) then 443 else 8443 end;
-def xhttp_sockopt: { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] };
+def reality_sockopt: if reality_listen == "127.0.0.1" then { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] } else {} end;
+def tls_sockopt: { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] };
 def xhttp_base_settings: { path: sec.inbound.xhttp_path };
 def xhttp_tls_settings: xhttp_base_settings + {
   mode: "auto",
@@ -62,7 +63,7 @@ def reality_inbound: {
       shortIds: sec.inbound.reality.short_ids
     },
     xhttpSettings: xhttp_base_settings,
-    sockopt: xhttp_sockopt
+    sockopt: reality_sockopt
   },
   sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
 };
@@ -80,7 +81,7 @@ def tls_inbound: {
     network: "xhttp",
     security: "none",
     xhttpSettings: xhttp_tls_settings,
-    sockopt: xhttp_sockopt
+    sockopt: tls_sockopt
   },
   sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
 };
@@ -122,11 +123,7 @@ def hysteria_inbound: {
       }],
       quicParams: {
         congestion: cfg.inbound.hysteria.congestion,
-        bbrProfile: cfg.inbound.hysteria.bbr_profile,
-        udpHop: {
-          ports: cfg.inbound.hysteria.ports,
-          interval: cfg.inbound.hysteria.hop_interval
-        }
+        bbrProfile: cfg.inbound.hysteria.bbr_profile
       }
     }
   },

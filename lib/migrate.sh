@@ -26,7 +26,7 @@ kokoro_migrate() {
     ver="$(kokoro_cfg '.version')"
     if [[ "$ver" == "0.3.0" ]]; then
         if [[ "$(kokoro_cfg '.caddy.version')" == "2.9.1" ]]; then
-            kokoro_cfg_set_str '.caddy.version' '2.11.3'
+            kokoro_cfg_set_str '.caddy.version' '2.11.9'
         fi
         kokoro_cfg_set_str '.version' '0.4.0'
         kokoro_sec_set_str '.version' '0.4.0'
@@ -35,6 +35,9 @@ kokoro_migrate() {
 
     ver="$(kokoro_cfg '.version')"
     if [[ "$ver" == "0.4.0" ]]; then
+        if [[ "$(kokoro_cfg '.caddy.version')" == "2.11.3" ]]; then
+            kokoro_cfg_set_str '.caddy.version' '2.11.9'
+        fi
         kokoro_cfg_set_str '.version' '0.5.0'
         kokoro_sec_set_str '.version' '0.5.0'
         kokoro_log "migrated config 0.4.0 → 0.5.0"

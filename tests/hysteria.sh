@@ -42,8 +42,11 @@ jq -e '
     and .streamSettings.method == "hysteria"
     and .streamSettings.finalmask.quicParams.bbrProfile == "aggressive"
     and .streamSettings.finalmask.udp[0].type == "salamander"
-    and (.streamSettings.finalmask.udp[0].settings | has("packetSize") | not))
+    and (.streamSettings.finalmask.udp[0].settings | has("packetSize") | not)
+    and (.streamSettings.finalmask.udp | length == 1)
+    and (.streamSettings.finalmask.quicParams | has("udpHop") | not))
   and any(.inbounds[]; .tag == "REALITY_XHTTP_IN" and .listen == "127.0.0.1" and .port == 8443)
+  and (.inbounds[] | select(.tag == "REALITY_XHTTP_IN") | .streamSettings.sockopt.trustedXForwardedFor == ["Kokoro-Trusted-XFF"])
 ' "$TMP/xray.json" >/dev/null
 grep -q 'protocols h1 h2' "$TMP/Caddyfile"
 ! grep -q 'protocols.*h3' "$TMP/Caddyfile"

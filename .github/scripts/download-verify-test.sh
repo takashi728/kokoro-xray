@@ -17,17 +17,17 @@ MD5= unused
 SHA2-256= ${sha}
 EOF
 
-kokoro_xray_verify_zip "${OUT}/test.zip" "${OUT}/test.zip.dgst"
+kokoro_xray_verify_zip "${OUT}/test.zip" "$sha"
 echo "checksum_ok OK"
 
-cat >"${OUT}/bad.zip.dgst" <<'EOF'
-SHA2-256= 0000000000000000000000000000000000000000000000000000000000000000
-EOF
-
-if (kokoro_xray_verify_zip "${OUT}/test.zip" "${OUT}/bad.zip.dgst" >/dev/null 2>&1); then
+if (kokoro_xray_verify_zip "${OUT}/test.zip" 0000000000000000000000000000000000000000000000000000000000000000 >/dev/null 2>&1); then
     echo "bad checksum unexpectedly passed" >&2
     exit 1
 fi
 
 echo "checksum_bad OK"
+
+[[ "$(kokoro_xray_sha256 "$KOKORO_XRAY_VERSION" 64)" == "$KOKORO_XRAY_SHA256_AMD64" ]]
+[[ "$(kokoro_xray_sha256 "$KOKORO_XRAY_VERSION" arm64-v8a)" == "$KOKORO_XRAY_SHA256_ARM64" ]]
+echo "release_pins OK"
 echo "download-verify-test OK"

@@ -38,7 +38,6 @@ printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.security == "tls
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "cdn.example.com"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.fingerprint == "chrome"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.alpn[0] == "h2"' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.echConfigList == "https://cloudflare-dns.com/dns-query"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.mode == "auto"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
@@ -87,8 +86,14 @@ hysteria="$(kokoro_link_hysteria_url | tr -d '\n')"
 
 hysteria_json="$(kokoro_link_show --json hysteria)"
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].settings.port == 443' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.ports == "443,20000-20020"' >/dev/null
-printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.finalmask.quicParams.udpHop.interval == "10-20"' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '.routing.rules == [{"type":"field","network":"tcp,udp","outboundTag":"kokoro-hysteria2"}]' >/dev/null
+printf '%s\n' "$hysteria_json" | jq -e '
+    .outbounds[0].streamSettings.finalmask.udp[1] == {
+      "type": "udphop",
+      "settings": {"mode":"intervalremote","interval":"10-20","remotePorts":"443,20000-20020"}
+    }
+    and (.outbounds[0].streamSettings.finalmask.quicParams | has("udpHop") | not)
+' >/dev/null
 printf '%s\n' "$hysteria_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.serverName == "hy2.example.com"' >/dev/null
 printf '%s\n' "$hysteria_json" | jq -e '
     .outbounds[0].streamSettings.finalmask.udp[0].type == "salamander"

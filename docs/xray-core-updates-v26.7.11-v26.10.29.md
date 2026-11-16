@@ -1,5 +1,9 @@
 # Xray-core upstream changes: v26.7.11 → v26.10.29
 
+> **Superseded:** upstream withdrew `v26.10.29` during the
+> CVE-2026-98432 response. Do not deploy it. The repository now pins
+> `v26.11.9`; see `docs/upstream-security-research-2026-11-16.md`.
+
 Scope: commits after v26.7.11 (exclusive) through v26.10.29 (inclusive) — 171 commits, 5 published releases (v26.7.28, v26.9.9, v26.9.30, v26.10.21, v26.10.29). Two releases (v26.10.10, v26.10.17) were withdrawn and no longer exist as git refs.
 Method: GitHub compare API commit log (primary source), release bodies, and the cited PRs. Every claim below carries its PR or release citation.
 
@@ -61,7 +65,10 @@ Method: GitHub compare API commit log (primary source), release bodies, and the 
 
 ## 3. Operator impact for this repo (kokoro-xray)
 
-- **Version bump**: one line — `lib/geodata.sh:6` sets `KOKORO_XRAY_VERSION=${KOKORO_XRAY_VERSION:-v26.7.11}`; the release binaries are pulled from `https://github.com/XTLS/Xray-core/releases/download/${KOKORO_XRAY_VERSION}` (`lib/geodata.sh:33`). Bump to `v26.10.29`. The CA story alone (built-in RootCAs + the broken sub-CA removal) makes this the security-critical upgrade of the half-year.
+- **Version bump**: the historical `v26.10.29` target was withdrawn. The
+  repository now pins `v26.11.9` with per-architecture SHA-256 verification. The
+  CA story alone (built-in RootCAs + the broken sub-CA removal) made this the
+  security-critical upgrade of the half-year.
 - **VLESS + Reality/XHTTP inbound templates**: no breaking config changes found in-range. Server-side localAddr accuracy (PR #6526) and refined REALITY parsing warnings (PR #6508) are behavioral improvements only; `inbound-reality.json` / `inbound-tls.json` shapes remain valid.
 - **XTLS Vision flow (`xtls-rprx-vision`)**: shipped release binaries are precompiled, so Go 1.27.3+ compatibility (PR #7176) is already baked in — no template action; it only matters if the repo ever compiles Xray from source.
 - **WG-PSK inbound**: the WireGuard-inbound fixes (fake-pong ICMP, idle-UDP memory, kernelTun IPv6, startup races, PR #6855/#6856/#6881/#6852) directly harden the exit WG inbound; no config changes.

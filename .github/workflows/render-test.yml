@@ -15,12 +15,20 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
       - name: Run render tests
         run: bash .github/scripts/render-test.sh
+      - name: Run download verification tests
+        run: bash .github/scripts/download-verify-test.sh
+      - name: Run Caddy Go tests
+        run: bash .github/scripts/caddy-go-test.sh
+      - name: Run Caddy tuning tests
+        run: bash .github/scripts/caddy-tune-test.sh
       - name: Run reality-scan tests
         run: bash .github/scripts/reality-scan-test.sh
       - name: Run network-tune tests
         run: bash .github/scripts/network-tune-test.sh
       - name: Run link tests
         run: bash .github/scripts/link-test.sh
+      - name: Run health tests
+        run: bash .github/scripts/health-test.sh
       - name: Run VLESS Encryption tests
         run: bash .github/scripts/vless-encryption-test.sh
       - name: Run firewall tests
@@ -29,5 +37,16 @@ jobs:
         run: bash .github/scripts/os-test.sh
       - name: Run source path tests
         run: bash .github/scripts/source-path-test.sh
+      - name: Run state tests
+        run: bash .github/scripts/state-test.sh
+      - name: Install pinned Xray
+        run: |
+          mkdir -p /tmp/kokoro-xray-ci
+          version=26.11.9
+          curl -fsSL "https://github.com/XTLS/Xray-core/releases/download/v${version}/Xray-linux-64.zip" -o /tmp/kokoro-xray-ci/xray.zip
+          printf '%s  %s\n' b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82 /tmp/kokoro-xray-ci/xray.zip | sha256sum -c -
+          unzip -q /tmp/kokoro-xray-ci/xray.zip -d /tmp/kokoro-xray-ci
+      - name: Run Hysteria2 tests
+        run: XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
       - name: Live REALITY probe (github.com)
         run: KOKORO_LIVE_SCAN=1 bash .github/scripts/reality-scan-test.sh

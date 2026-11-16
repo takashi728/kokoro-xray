@@ -2,6 +2,49 @@
 # kokoro-xray — node health status
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
+source "${KOKORO_ROOT}/lib/caddy.sh"
+
+kokoro_health_kernel_cve() {
+    local id="${KOKORO_OS_ID:-}" ver="${KOKORO_OS_VER:-}"
+    local rel base abi safe="" safe_abi="" fixed=false mptcp migrate
+    if [[ -z "$id" ]]; then
+        if [[ -f /etc/os-release ]]; then
+            # shellcheck disable=SC1091
+            . /etc/os-release
+            id="${ID:-}"
+            ver="${VERSION_ID:-}"
+        fi
+    fi
+    rel="$(uname -r)"
+    case "$id:$ver" in
+        debian:12) safe="6.1.190" ;;
+        debian:13) safe="6.12.113" ;;
+        ubuntu:22.04) safe="5.15.0" safe_abi="203" ;;
+        ubuntu:24.04) safe="6.8.0" safe_abi="149" ;;
+        ubuntu:26.04) safe="7.0.0" safe_abi="43" ;;
+    esac
+    [[ -n "$safe" ]] || return 0
+    if [[ "$id" == "ubuntu" && "$rel" == *-* ]]; then
+        base="${rel%%-*}"
+        abi="${rel#*-}"
+        abi="${abi%%[!0-9]*}"
+        if [[ "$base" == "$safe" && "$abi" =~ ^[0-9]+$ && "$abi" -ge "$safe_abi" ]]; then
+            fixed=true
+        elif [[ "$base" != "$safe" ]] &&
+             [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] &&
+             kokoro_version_ge "$base" "$safe"; then
+            fixed=true
+        fi
+    else
+        rel="${rel%%-*}"
+        rel="${rel%%+*}"
+        kokoro_version_ge "$rel" "$safe" && fixed=true
+    fi
+    mptcp="$(sysctl -n net.mptcp.enabled 2>/dev/null || echo unknown)"
+    migrate="$(sysctl -n net.ipv4.tcp_migrate_req 2>/dev/null || echo unknown)"
+    [[ "$fixed" == "true" ]] ||
+    echo "kernel:   ${rel} is below the CVE-2026-98432 fix ${safe}${safe_abi:+-$safe_abi} (mptcp=${mptcp}, migrate_req=${migrate})"
+}
 
 kokoro_health() {
     local role
@@ -22,6 +65,7 @@ kokoro_health() {
     if [[ "$role" == "edge" ]]; then
         local mode
         mode="$(kokoro_cfg '.inbound.mode')"
+        kokoro_health_kernel_cve
         echo "vless enc: $(kokoro_cfg '.inbound.vless_encryption.enabled // false')"
         echo "hysteria:  $(kokoro_cfg '.inbound.hysteria.enabled // false')"
         if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then

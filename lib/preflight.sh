@@ -64,6 +64,9 @@ kokoro_preflight_edge() {
 
     if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
         kokoro_preflight_hysteria "$cdn"
+        if [[ "$mode" == "reality" && "$(kokoro_cfg '.caddy.use_l4')" != "true" ]]; then
+            kokoro_die "Hysteria2 in reality mode needs caddy.use_l4=true for the TCP pivot"
+        fi
     fi
 
     if [[ "$(kokoro_cfg '.tor.enabled')" == "true" ]]; then

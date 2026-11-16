@@ -72,13 +72,6 @@ safe_install_dir() {
     fi
 }
 
-remove_install_dir() {
-    safe_install_dir
-    [[ -e "$INSTALL_DIR" ]] || return 0
-    log "removing install files: $INSTALL_DIR"
-    rm -rf -- "$INSTALL_DIR"
-}
-
 install_bootstrap_deps() {
     local package
     local -a packages=(
@@ -119,28 +112,53 @@ install_bootstrap_deps() {
 }
 
 install_local() {
-    local src="$SCRIPT_DIR"
+    local src="$SCRIPT_DIR" staged="${INSTALL_DIR}.new.$$" old="${INSTALL_DIR}.old.$$"
     [[ -f "${src}/kokoro-xray.sh" ]] || die "run from repo root or set KOKORO_REPO_URL"
+    safe_install_dir
+    rm -rf -- "$staged"
+    install -d "$staged"
+    cp -a "${src}/." "$staged/"
     if [[ "$CLEAN_INSTALL" == "true" ]]; then
         if [[ "$(readlink -f "$src")" == "$(readlink -f "$INSTALL_DIR" 2>/dev/null || printf '%s' "$INSTALL_DIR")" ]]; then
             die "clean reinstall from the live install dir requires --branch BRANCH"
         fi
-        remove_install_dir
     fi
-    install -d "$INSTALL_DIR"
-    cp -a "${src}/." "$INSTALL_DIR/"
+    if [[ -e "$INSTALL_DIR" ]]; then
+        rm -rf -- "$old"
+        mv "$INSTALL_DIR" "$old"
+    fi
+    if ! mv "$staged" "$INSTALL_DIR"; then
+        [[ -e "$old" ]] && mv "$old" "$INSTALL_DIR"
+        rm -rf -- "$staged"
+        die "failed to activate local repository"
+    fi
+    rm -rf -- "$old"
     chmod +x "${INSTALL_DIR}/kokoro-xray.sh" "${INSTALL_DIR}/install.sh"
     chmod +x "${INSTALL_DIR}/lib/"*.sh "${INSTALL_DIR}/roles/"*.sh 2>/dev/null || true
     chmod 644 "${INSTALL_DIR}/data/"*.txt 2>/dev/null || true
 }
 
 install_remote() {
-    remove_install_dir
+    local staged="${INSTALL_DIR}.new.$$" old="${INSTALL_DIR}.old.$$"
+    safe_install_dir
+    rm -rf -- "$staged"
     if [[ -n "$REPO_BRANCH" ]]; then
-        git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"
+        git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$staged" ||
+            { rm -rf -- "$staged"; die "failed to clone ${REPO_BRANCH}"; }
     else
-        git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+        git clone --depth 1 "$REPO_URL" "$staged" ||
+            { rm -rf -- "$staged"; die "failed to clone repository"; }
     fi
+    if [[ -e "$INSTALL_DIR" ]]; then
+        rm -rf -- "$old"
+        mv "$INSTALL_DIR" "$old"
+    fi
+    if ! mv "$staged" "$INSTALL_DIR"; then
+        [[ -e "$old" ]] && mv "$old" "$INSTALL_DIR"
+        rm -rf -- "$staged"
+        die "failed to activate cloned repository"
+    fi
+    rm -rf -- "$old"
     chmod +x "${INSTALL_DIR}/kokoro-xray.sh" "${INSTALL_DIR}/install.sh"
     chmod +x "${INSTALL_DIR}/lib/"*.sh "${INSTALL_DIR}/roles/"*.sh 2>/dev/null || true
     chmod 644 "${INSTALL_DIR}/data/"*.txt 2>/dev/null || true

@@ -4,10 +4,10 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 source "${KOKORO_ROOT}/lib/os.sh"
 
-KOKORO_XCADDY_VERSION="${KOKORO_XCADDY_VERSION:-v0.4.6}"
-KOKORO_CADDY_L4_VERSION="${KOKORO_CADDY_L4_VERSION:-v0.1.1}"
-KOKORO_GO_MIN_VERSION="${KOKORO_GO_MIN_VERSION:-1.25.0}"
-KOKORO_GO_VERSION="${KOKORO_GO_VERSION:-1.26.5}"
+KOKORO_XCADDY_VERSION="${KOKORO_XCADDY_VERSION:-v0.4.7}"
+KOKORO_CADDY_L4_VERSION="${KOKORO_CADDY_L4_VERSION:-v0.1.3}"
+KOKORO_GO_MIN_VERSION="${KOKORO_GO_MIN_VERSION:-1.26.9}"
+KOKORO_GO_VERSION="${KOKORO_GO_VERSION:-1.26.11}"
 KOKORO_GO_PREFIX="${KOKORO_GO_PREFIX:-/usr/local/kokoro-go}"
 
 kokoro_caddy_version() {
@@ -140,23 +140,24 @@ kokoro_go_arch() {
     esac
 }
 
-kokoro_go_download() { # version arch tmp
-    local url="https://go.dev/dl/go${1}.linux-${2}.tar.gz"
-    curl -fsSL "$url" -o "${3}/go.tgz"
+kokoro_go_sha256() { # version arch
+    if [[ "$1" == "1.26.11" ]]; then
+        case "$2" in
+            amd64) printf '%s\n' "9849f4e04ee35303714e34fbc3ac8ab44ea3e448a95aa182f91e3b9b79c710ec" ;;
+            arm64) printf '%s\n' "6c2f29b458b5add0835f18b776f69c8881a6d88428f1484a6da55755e620757e" ;;
+            *) return 1 ;;
+        esac
+    else
+        return 1
+    fi
 }
 
-kokoro_go_first_downloadable() { # arch tmp -> version that downloads (or 1)
-    local arch="$1" tmp="$2" v
-    while IFS= read -r v; do
-        v="${v#go}"
-        [[ "$v" == "$KOKORO_GO_VERSION" ]] && continue
-        if kokoro_go_download "$v" "$arch" "$tmp"; then
-            printf '%s' "$v"
-            return 0
-        fi
-    done < <(curl -fsSL "https://go.dev/dl/?mode=json" 2>/dev/null \
-        | jq -r '[.[] | select(.stable == true)][0:5][] | .version' 2>/dev/null)
-    return 1
+kokoro_go_download() { # version arch tmp
+    local sha url="https://go.dev/dl/go${1}.linux-${2}.tar.gz"
+    sha="$(kokoro_go_sha256 "$1" "$2")" ||
+        kokoro_die "no pinned SHA-256 for Go ${1} linux-${2}"
+    curl -fsSL "$url" -o "${3}/go.tgz"
+    printf '%s  %s\n' "$sha" "${3}/go.tgz" | sha256sum -c - >/dev/null
 }
 
 kokoro_go_install_official() {
@@ -178,19 +179,24 @@ kokoro_go_install_official() {
     tmp="$(mktemp -d)"
 
     kokoro_log "installing Go ${KOKORO_GO_VERSION} for Caddy build"
-    if ! kokoro_go_download "$go_version" "$arch" "$tmp"; then
-        go_version="$(kokoro_go_first_downloadable "$arch" "$tmp")" \
-            || kokoro_die "failed to download Go ${KOKORO_GO_VERSION}"
-        kokoro_warn "Go ${KOKORO_GO_VERSION} unavailable; falling back to ${go_version}"
-        prefix="${KOKORO_GO_PREFIX}/go${go_version}"
-        go_bin="${prefix}/bin/go"
-    fi
-
-    rm -rf "$prefix"
+    kokoro_go_download "$go_version" "$arch" "$tmp" ||
+        kokoro_die "failed to download Go ${go_version}"
+    tar -C "$tmp" -xzf "${tmp}/go.tgz" || kokoro_die "failed to extract Go ${go_version}"
     install -d "$KOKORO_GO_PREFIX"
-    tar -C "$KOKORO_GO_PREFIX" -xzf "${tmp}/go.tgz" || kokoro_die "failed to extract Go ${go_version}"
-    mv "${KOKORO_GO_PREFIX}/go" "$prefix"
-    rm -rf "$tmp"
+    if [[ -e "$prefix" ]]; then
+        mv "$prefix" "${prefix}.old.$$"
+    fi
+    if [[ ! -x "${tmp}/go/bin/go" ]]; then
+        [[ -e "${prefix}.old.$$" ]] && mv "${prefix}.old.$$" "$prefix"
+        rm -rf "$tmp"
+        kokoro_die "Go install failed: staged binary missing"
+    fi
+    if ! mv "${tmp}/go" "$prefix"; then
+        [[ -e "${prefix}.old.$$" ]] && mv "${prefix}.old.$$" "$prefix"
+        rm -rf "$tmp"
+        kokoro_die "failed to install Go ${go_version}"
+    fi
+    rm -rf "${prefix}.old.$$" "$tmp"
     [[ -x "$go_bin" ]] || kokoro_die "Go install failed: $go_bin missing"
     KOKORO_CADDY_GO_BIN="$go_bin"
 }
@@ -213,7 +219,7 @@ kokoro_go_for_caddy() {
 }
 
 kokoro_caddy_install() {
-    local dest caddy_version go_bin go_path
+    local dest caddy_version go_bin go_path staged
     kokoro_need_root
     dest="$(kokoro_cfg '.paths.caddy_bin')"
     caddy_version="$(kokoro_caddy_version)"
@@ -230,6 +236,8 @@ kokoro_caddy_install() {
     go_bin="$KOKORO_CADDY_GO_BIN"
     go_path="$(dirname "$go_bin"):${PATH}"
     PATH="$go_path"
+    staged="${dest}.new.$$"
+    rm -f "$staged"
     export GOBIN=/usr/local/bin
     kokoro_run_cmd "install xcaddy" "$go_bin" install "github.com/caddyserver/xcaddy/cmd/xcaddy@${KOKORO_XCADDY_VERSION}" \
         || kokoro_die "failed to install xcaddy ${KOKORO_XCADDY_VERSION}"
@@ -238,20 +246,23 @@ kokoro_caddy_install() {
     if kokoro_caddy_needs_l4; then
         kokoro_log "building Caddy ${caddy_version} with caddy-l4 ${KOKORO_CADDY_L4_VERSION}"
         kokoro_log "this can take several minutes on small VPS instances"
-        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --with "github.com/mholt/caddy-l4@${KOKORO_CADDY_L4_VERSION}" --output "$dest" \
+        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --with "github.com/mholt/caddy-l4@${KOKORO_CADDY_L4_VERSION}" --output "$staged" \
             || kokoro_die "failed to build Caddy ${caddy_version}"
     else
         kokoro_log "building Caddy ${caddy_version}"
         kokoro_log "this can take several minutes on small VPS instances"
-        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --output "$dest" \
+        kokoro_run_cmd "caddy build" /usr/local/bin/xcaddy build "$caddy_version" --output "$staged" \
             || kokoro_die "failed to build Caddy ${caddy_version}"
     fi
 
-    [[ -x "$dest" || -f "$dest" ]] || kokoro_die "caddy build did not create $dest"
-    chmod 755 "$dest"
+    [[ -f "$staged" ]] || kokoro_die "caddy build did not create $staged"
+    chmod 755 "$staged"
+    [[ "$("$staged" version 2>/dev/null | awk '{print $1}')" == "$caddy_version" ]] ||
+        kokoro_die "built Caddy version does not match ${caddy_version}"
     if kokoro_caddy_needs_l4; then
-        "$dest" list-modules 2>/dev/null | grep -q 'layer4' || kokoro_die "caddy-l4 module missing after xcaddy build"
+        "$staged" list-modules 2>/dev/null | grep -q 'layer4' || kokoro_die "caddy-l4 module missing after xcaddy build"
     fi
+    mv "$staged" "$dest"
     kokoro_log "caddy ${caddy_version} installed to ${dest}"
     kokoro_caddy_install_service
 }

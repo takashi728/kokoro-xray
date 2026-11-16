@@ -132,20 +132,28 @@ kokoro_link_hysteria_json() {
                       settings: {
                         password: $obfs
                       }
+                    },
+                    {
+                      type: "udphop",
+                      settings: {
+                        mode: "intervalremote",
+                        interval: $interval,
+                        remotePorts: $ports
+                      }
                     }
                   ],
                   quicParams: {
                     congestion: $congestion,
-                    bbrProfile: $profile,
-                    udpHop: {
-                      ports: $ports,
-                      interval: $interval
-                    }
+                    bbrProfile: $profile
                   }
                 }
               }
             }
-          ]
+          ],
+          routing: {
+            domainStrategy: "IPIfNonMatch",
+            rules: [{ type: "field", network: "tcp,udp", outboundTag: "kokoro-hysteria2" }]
+          }
         }'
 }
 
@@ -211,8 +219,7 @@ kokoro_link_tls_json() {
                 tlsSettings: {
                   serverName: $cdn,
                   fingerprint: "chrome",
-                  alpn: ["h2"],
-                  echConfigList: "https://cloudflare-dns.com/dns-query"
+                  alpn: ["h2"]
                 },
                 xhttpSettings: {
                   path: $path,

@@ -3,7 +3,9 @@
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
-KOKORO_XRAY_VERSION="${KOKORO_XRAY_VERSION:-v26.10.29}"
+KOKORO_XRAY_VERSION="${KOKORO_XRAY_VERSION:-v26.11.9}"
+KOKORO_XRAY_SHA256_AMD64="b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"
+KOKORO_XRAY_SHA256_ARM64="64ed6858982a7f5eb85d88b811089063bd4f17561f4c8f44e0f1dc8e6f6430be"
 
 kokoro_xray_release_arch() {
     local arch
@@ -20,20 +22,28 @@ kokoro_xray_release_zip() {
     printf 'Xray-linux-%s.zip\n' "$(kokoro_xray_release_arch)"
 }
 
+kokoro_xray_sha256() { # version arch
+    [[ "$1" == "$KOKORO_XRAY_VERSION" ]] || return 1
+    case "$2" in
+        64) printf '%s\n' "$KOKORO_XRAY_SHA256_AMD64" ;;
+        arm64-v8a) printf '%s\n' "$KOKORO_XRAY_SHA256_ARM64" ;;
+        *) return 1 ;;
+    esac
+}
+
 kokoro_xray_verify_zip() {
-    local zip_path="$1" dgst_path="$2" expected
-    expected="$(awk -F'= *' '$1 == "SHA2-256" { gsub(/[[:space:]\r]/, "", $2); print $2; exit }' "$dgst_path")"
-    [[ -n "$expected" ]] || kokoro_die "SHA2-256 not found in $(basename "$dgst_path")"
+    local zip_path="$1" expected="$2"
     printf '%s  %s\n' "$expected" "$zip_path" | sha256sum -c - >/dev/null
 }
 
 kokoro_xray_download_release_zip() {
-    local tmp="$1" zip base_url
+    local tmp="$1" zip arch expected base_url
     zip="$(kokoro_xray_release_zip)"
+    expected="$(kokoro_xray_sha256 "$KOKORO_XRAY_VERSION" "$(kokoro_xray_release_arch)")" ||
+        kokoro_die "no pinned SHA-256 for $KOKORO_XRAY_VERSION/$(kokoro_xray_release_arch)"
     base_url="https://github.com/XTLS/Xray-core/releases/download/${KOKORO_XRAY_VERSION}"
     curl -fsSL "${base_url}/${zip}" -o "${tmp}/${zip}"
-    curl -fsSL "${base_url}/${zip}.dgst" -o "${tmp}/${zip}.dgst"
-    kokoro_xray_verify_zip "${tmp}/${zip}" "${tmp}/${zip}.dgst"
+    kokoro_xray_verify_zip "${tmp}/${zip}" "$expected"
     printf '%s\n' "$zip"
 }
 

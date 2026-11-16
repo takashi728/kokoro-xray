@@ -23,7 +23,7 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 - Hysteria2 UDP ports open when enabled, default `443,20000-20020/udp`
 - A direct, DNS-only domain for Hysteria2 certificate issuance
 - Exit node UDP port open when using edge + exit, default `51820/udp`
-- Xray-core `v26.7.11` or newer for Hysteria2
+- Xray-core `v26.11.9` or newer for Hysteria2
 
 ## Install
 
@@ -113,10 +113,8 @@ TLS XHTTP JSON export for clients that support full JSON import:
 kokoro-xray link --json tls
 ```
 
-Use JSON export for TLS mode when the client app does not preserve advanced XHTTP settings from URL subscriptions.
-The JSON profile also requires ECH for the configured Cloudflare CDN domain,
-obtaining its ECH configuration through Cloudflare DoH. Use a current Xray
-client and keep that domain proxied with Cloudflare ECH enabled.
+Use JSON export for TLS mode when the client app does not preserve advanced
+XHTTP settings from URL subscriptions. Use a current Xray client.
 
 ## Commands
 
@@ -163,7 +161,7 @@ parallel with the selected VLESS mode and defaults to:
 
 - Real Let's Encrypt certificate managed by Caddy
 - UDP port hopping across `443,20000-20020`
-- Gecko, which wraps Salamander and fragments QUIC handshake packets
+- Salamander packet obfuscation (upstream's Gecko mode is not enabled)
 - BBR with the aggressive profile
 - HTTP/3 masquerade proxying to the selected public website
 
@@ -193,7 +191,7 @@ The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect b
 
 ## Notes
 
-- Xray downloads are verified with upstream SHA256 digest files.
+- Xray downloads are verified against repository-pinned SHA-256 hashes.
 - Xray-core is pinned to the latest tested stable release.
 - Caddy builds are pinned and rebuilt only when needed.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
