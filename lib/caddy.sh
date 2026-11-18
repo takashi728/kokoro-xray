@@ -26,7 +26,8 @@ kokoro_caddy_needs_l4() {
     use_l4="$(kokoro_cfg '.caddy.use_l4')"
     hysteria="$(kokoro_cfg '.inbound.hysteria.enabled // false')"
     [[ "$use_l4" == "true" &&
-       ( "$mode" == "both" || ( "$mode" == "reality" && "$hysteria" == "true" ) ) ]]
+       ( "$mode" == "both" || ( "$mode" == "reality" && "$hysteria" == "true" ) ||
+         ( "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw && "$mode" == tls ) ) ]]
 }
 
 kokoro_caddy_installed_matches() {
@@ -320,30 +321,59 @@ WantedBy=multi-user.target
 EOF
 }
 
-kokoro_hysteria_prepare_certificate() {
-    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]] || return 0
+kokoro_caddy_restore_after_certificate() { # backup directory, prior Caddy state, stopped Xray, config path
+    local backup="$1" caddy_active="$2" stopped_xray="$3" caddyfile="$4"
+    if [[ -f "$backup/Caddyfile" ]]; then
+        cp "$backup/Caddyfile" "$caddyfile"
+    else
+        rm -f "$caddyfile"
+    fi
+    if [[ "$caddy_active" == true ]]; then
+        systemctl restart caddy || kokoro_warn "failed to restore previous Caddy service"
+    else
+        systemctl stop caddy || true
+    fi
+    if [[ "$stopped_xray" == true ]]; then
+        systemctl restart xray || kokoro_warn "failed to restore previous Xray service"
+    fi
+    rm -rf "$backup"
+}
 
-    local domain cert key i mode caddy_bin caddyfile stopped_xray=false cert_root
+kokoro_caddy_prepare_certificate() { # domain, certificate state prefix
+    local domain="$1" state_prefix="$2" cert key i mode caddy_bin caddyfile stopped_xray=false cert_root
     local canonical_cert canonical_key cert_mode key_mode
+    local backup caddy_active=false xray_config
     kokoro_validate_service_paths
-    domain="$(kokoro_cfg '.inbound.hysteria.domain' | tr '[:upper:]' '[:lower:]')"
+    domain="${domain,,}"
+    [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] ||
+        kokoro_die "invalid certificate domain: $domain"
+    [[ "$state_prefix" == tls || "$state_prefix" == hysteria ]] ||
+        kokoro_die "invalid certificate state prefix"
     mode="$(kokoro_cfg '.inbound.mode')"
     caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
     cert_root="$(realpath -m -- "$(kokoro_hysteria_cert_root)")"
     install -d -m 700 /var/lib/kokoro-caddy
-    kokoro_render_caddy
-    "$caddy_bin" validate --config "$caddyfile" ||
-        kokoro_die "invalid Caddy config for Hysteria2 certificate"
+    backup="$(mktemp -d)"
+    [[ ! -f "$caddyfile" ]] || cp "$caddyfile" "$backup/Caddyfile"
+    if systemctl is-active --quiet caddy 2>/dev/null; then caddy_active=true; fi
+    if ! kokoro_render_caddy || ! "$caddy_bin" validate --config "$caddyfile"; then
+        kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" false "$caddyfile"
+        kokoro_die "invalid Caddy config for Xray certificate"
+    fi
 
-    if [[ "$mode" == "reality" ]] && systemctl is-active --quiet xray 2>/dev/null; then
-        systemctl stop xray
-        stopped_xray=true
+    xray_config="$(kokoro_cfg '.paths.xray_config')"
+    if systemctl is-active --quiet xray 2>/dev/null; then
+        if [[ "$mode" == reality ]] || jq -e 'any(.inbounds[]?;
+            .protocol == "vless" and .port == 443 and .listen != "127.0.0.1")' "$xray_config" >/dev/null 2>&1; then
+            systemctl stop xray
+            stopped_xray=true
+        fi
     fi
 
     if ! systemctl restart caddy; then
-        [[ "$stopped_xray" == "true" ]] && systemctl restart xray || true
-        kokoro_die "caddy failed while requesting Hysteria2 certificate"
+        kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" "$stopped_xray" "$caddyfile"
+        kokoro_die "caddy failed while requesting Xray certificate"
     fi
 
     kokoro_log "waiting for Let's Encrypt certificate: ${domain}"
@@ -363,17 +393,26 @@ kokoro_hysteria_prepare_certificate() {
             (( (8#${cert_mode} & 8#022) == 0 &&
                (8#${key_mode} & 8#022) == 0 )) ||
                 continue
-            kokoro_cfg_set_str '.paths.hysteria_cert' "$canonical_cert"
-            kokoro_cfg_set_str '.paths.hysteria_key' "$canonical_key"
-            kokoro_log "Hysteria2 certificate ready"
+            kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" "$stopped_xray" "$caddyfile"
+            kokoro_cfg_set_str ".paths.${state_prefix}_cert" "$canonical_cert"
+            kokoro_cfg_set_str ".paths.${state_prefix}_key" "$canonical_key"
+            kokoro_log "${state_prefix} certificate ready"
             return 0
         fi
         sleep 2
     done
 
-    if [[ "$stopped_xray" == "true" ]]; then
-        systemctl stop caddy || true
-        systemctl restart xray || true
-    fi
+    kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" "$stopped_xray" "$caddyfile"
     kokoro_die "certificate not issued; verify DNS points directly here and ports 80/tcp + 443/tcp are open"
+}
+
+kokoro_hysteria_prepare_certificate() {
+    [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == true ]] || return 0
+    kokoro_caddy_prepare_certificate "$(kokoro_cfg '.inbound.hysteria.domain')" hysteria
+}
+
+kokoro_tls_prepare_certificate() {
+    kokoro_raw_tls_enabled || return 0
+    [[ "$(kokoro_cfg '.caddy.use_l4')" == true ]] || kokoro_die "RAW TLS requires caddy.use_l4=true"
+    kokoro_caddy_prepare_certificate "$(kokoro_tls_domain)" tls
 }

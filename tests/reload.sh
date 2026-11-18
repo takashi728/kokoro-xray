@@ -63,6 +63,22 @@ HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_TEST_HYSTERIA_CERT_ROOT="$cert_root" \
   kokoro_hysteria_cert_reload_sync
 '
 [[ ! -e "$path_unit" && ! -e "$service_unit" ]]
-grep -qx 'disable kokoro-hysteria-cert.path' "${TMP}/systemctl.log"
+grep -qx 'disable --now kokoro-hysteria-cert.path' "${TMP}/systemctl.log"
+
+jq '.inbound.transport = "raw" | .inbound.mode = "tls"
+    | .inbound.hysteria.enabled = false
+    | .paths.tls_cert = .paths.hysteria_cert
+    | .paths.tls_key = .paths.hysteria_key' "${state}/config.json" >"${TMP}/next.json"
+mv "${TMP}/next.json" "${state}/config.json"
+HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_TEST_HYSTERIA_CERT_ROOT="$cert_root" \
+    KOKORO_TEST_SYSTEMD_UNIT_DIR="$unit_dir" bash -c '
+    set -euo pipefail
+    source "${KOKORO_ROOT}/lib/reload.sh"
+    systemctl() { printf "%s\n" "$*" >>"${HOME}/systemctl.log"; }
+    kokoro_cert_reload_sync tls
+'
+grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.crt" "${unit_dir}/kokoro-tls-cert.path"
+grep -qx 'Unit=kokoro-tls-cert-reload.service' "${unit_dir}/kokoro-tls-cert.path"
+grep -qx 'enable --now kokoro-tls-cert.path' "${TMP}/systemctl.log"
 
 echo "reload-test OK"

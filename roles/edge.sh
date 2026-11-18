@@ -24,6 +24,7 @@ source "${KOKORO_ROOT}/lib/onboard.sh"
 source "${KOKORO_ROOT}/lib/cf.sh"
 source "${KOKORO_ROOT}/lib/apply.sh"
 source "${KOKORO_ROOT}/lib/network-tune.sh"
+source "${KOKORO_ROOT}/lib/fallback.sh"
 
 kokoro_edge_install() {
     local mode
@@ -33,6 +34,7 @@ kokoro_edge_install() {
     kokoro_cfg_set_str '.role' 'edge'
 
     kokoro_onboard_edge
+    kokoro_fallback_install
     kokoro_xray_install
 
     if [[ "$FORCE_SECRETS" == "true" ]]; then
@@ -55,7 +57,10 @@ kokoro_edge_install() {
     mode="$(kokoro_cfg '.inbound.mode')"
     if kokoro_caddy_required; then
         kokoro_caddy_install
-        [[ "$mode" == "tls" || "$mode" == "both" ]] && kokoro_cf_dns01_hint
+        if [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == xhttp && ( "$mode" == tls || "$mode" == both ) ]]; then
+            kokoro_cf_dns01_hint
+        fi
+        kokoro_tls_prepare_certificate
         kokoro_hysteria_prepare_certificate
     fi
 

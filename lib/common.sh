@@ -79,7 +79,7 @@ kokoro_hysteria_cert_root() {
     fi
 }
 
-kokoro_require_hysteria_file() { # config-key suffix
+kokoro_require_hysteria_file() { # config-key suffix; shared by HY2 and RAW TLS
     local key="$1" suffix="$2" path root canonical uid mode test_root=""
     local root_uid root_mode
     if [[ "${EUID}" -ne 0 ]]; then
@@ -103,13 +103,13 @@ kokoro_require_hysteria_file() { # config-key suffix
 
     if [[ -z "$test_root" ]]; then
         [[ -d "$root" && ! -L "$root" ]] ||
-            kokoro_die "Hysteria2 certificate root is not a directory: ${root}"
+            kokoro_die "managed certificate root is not a directory: ${root}"
         root_uid="$(stat -c '%u' "$root")"
         root_mode="$(stat -c '%a' "$root")"
         [[ "$root_uid" == "0" ]] ||
-            kokoro_die "Hysteria2 certificate root must be owned by root: ${root}"
+            kokoro_die "managed certificate root must be owned by root: ${root}"
         (( (8#${root_mode} & 8#022) == 0 )) ||
-            kokoro_die "Hysteria2 certificate root must not be group/world writable: ${root}"
+            kokoro_die "managed certificate root must not be group/world writable: ${root}"
         uid="$(stat -c '%u' "$canonical")"
         mode="$(stat -c '%a' "$canonical")"
         [[ "$uid" == "0" ]] || kokoro_die "${key} must be owned by root: ${path}"
@@ -217,6 +217,16 @@ kokoro_need_root() {
 
 kokoro_need_cmd() {
     command -v "$1" >/dev/null 2>&1 || kokoro_die "missing command: $1"
+}
+
+kokoro_raw_tls_enabled() {
+    [[ "$(kokoro_cfg '.role')" == edge && "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw &&
+       "$(kokoro_cfg '.inbound.mode')" =~ ^(tls|both)$ ]]
+}
+
+kokoro_tls_domain() {
+    if kokoro_raw_tls_enabled; then kokoro_cfg '.inbound.tls.domain'
+    else kokoro_cfg '.inbound.tls.cdn_domain'; fi
 }
 
 kokoro_caddy_required() {

@@ -4,6 +4,18 @@
 : "${KOKORO_ROOT:=$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)}"
 source "${KOKORO_ROOT}/lib/common.sh"
 
+kokoro_raw_tls_domain_check() {
+    local domain="$1" ip ips
+    [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] || return 1
+    source "${KOKORO_ROOT}/lib/reality-asn.sh"
+    ip="${KOKORO_PUBLIC_ADDRESS:-}"
+    [[ -n "$ip" ]] || ip="$(curl -4 -fsS --connect-timeout 3 --max-time 8 https://api.ipify.org)" || return 1
+    kokoro_reality_ip_literal "$ip" || return 1
+    ips="$(timeout 8 getent ahosts "$domain" | awk '{print $1}' | sort -u)"
+    grep -Fx -- "$ip" <<<"$ips" >/dev/null || return 1
+    kokoro_reality_cdn_screen "$domain" "$ips"
+}
+
 kokoro_onboard_reality_target() {
     local do_scan="$1" sni
     source "${KOKORO_ROOT}/lib/reality-scan.sh"
@@ -25,7 +37,7 @@ kokoro_onboard_reality_target() {
 }
 
 kokoro_onboard_edge() {
-    local mode cdn email hy_answer hy_enabled hy_domain hy_ports hy_masquerade
+    local mode cdn email hy_answer hy_enabled hy_domain hy_ports hy_masquerade transport default_transport default_mode
 
     if [[ ! -t 0 ]]; then
         mode="$(kokoro_cfg '.inbound.mode')"
@@ -34,20 +46,46 @@ kokoro_onboard_edge() {
             kokoro_reality_apply_host "$(kokoro_cfg '.inbound.reality.server_names[0]')" ||
                 kokoro_die "noninteractive REALITY setup requires a verified same-ASN target"
         fi
+        if kokoro_raw_tls_enabled; then
+            kokoro_raw_tls_domain_check "$(kokoro_tls_domain)" ||
+                kokoro_die "RAW TLS requires a direct domain resolving to this VPS; CDN checks failed"
+        fi
         return 0
     fi
 
-    read -r -p "Inbound mode [reality/tls/both] (both): " mode
-    mode="${mode:-both}"
+    default_transport="$(kokoro_cfg '.inbound.transport // "xhttp"')"
+    [[ -n "$(kokoro_sec '.inbound.uuid')" ]] || default_transport=raw
+    read -r -p "Transport [raw=CN performance/xhttp=CDN] (${default_transport}): " transport
+    transport="${transport:-$default_transport}"
+    [[ "$transport" == raw || "$transport" == xhttp ]] || kokoro_die "transport must be raw or xhttp"
+    kokoro_cfg_set_str '.inbound.transport' "$transport"
+    default_mode="$(kokoro_cfg '.inbound.mode')"
+    if [[ "$transport" == raw && -z "$(kokoro_sec '.inbound.uuid')" ]]; then default_mode=reality; fi
+    read -r -p "Inbound mode [reality/tls/both] (${default_mode}): " mode
+    mode="${mode:-$default_mode}"
     kokoro_cfg_set_str '.inbound.mode' "$mode"
 
     if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
-        read -r -p "CDN domain (e.g. cdn.example.com): " cdn
+        if [[ "$transport" == raw ]]; then
+            kokoro_warn "RAW TLS fallback excludes VLESS payload encryption; TLS and Vision remain active"
+            read -r -p "Direct TLS domain (DNS-only, pointing to this VPS): " cdn
+        else
+            read -r -p "CDN domain (e.g. cdn.example.com): " cdn
+        fi
         cdn="${cdn,,}"
-        [[ -n "$cdn" ]] && kokoro_cfg_set_str '.inbound.tls.cdn_domain' "$cdn"
+        if [[ "$transport" == raw ]]; then
+            [[ -n "$cdn" ]] || cdn="$(kokoro_cfg '.inbound.tls.domain')"
+            kokoro_log "checking direct TLS domain..."
+            kokoro_raw_tls_domain_check "$cdn" || kokoro_die "domain must resolve directly to this VPS and pass CDN screening"
+            kokoro_cfg_set_str '.inbound.tls.domain' "$cdn"
+        else
+            [[ -n "$cdn" ]] && kokoro_cfg_set_str '.inbound.tls.cdn_domain' "$cdn"
+        fi
         read -r -p "ACME email: " email
         [[ -n "$email" ]] && kokoro_cfg_set_str '.inbound.tls.acme_email' "$email"
-        kokoro_warn "Cloudflare: use Full (Strict) SSL; DNS-only during first cert if HTTP-01 fails"
+        if [[ "$transport" == xhttp ]]; then
+            kokoro_warn "Cloudflare: use Full (Strict) SSL; DNS-only during first cert if HTTP-01 fails"
+        fi
     fi
 
     if [[ "$mode" == "reality" || "$mode" == "both" ]]; then
