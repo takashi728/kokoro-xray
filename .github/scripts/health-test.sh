@@ -21,6 +21,33 @@ printf '%s\n' "$out" | grep -q 'TLS mode client note'
 printf '%s\n' "$out" | grep -q 'Please use HApp'
 printf '%s\n' "$out" | grep -q 'kokoro-xray link --json tls'
 printf '%s\n' "$out" | grep -q 'vless enc:'
+! grep -q 'hy2 cc:' <<<"$out"
+
+jq '.inbound.hysteria.enabled = true
+    | .inbound.hysteria.congestion = "bbr"
+    | .inbound.hysteria.bbr_profile = "aggressive"' \
+    "${tmp_home}/.kokoro-xray/config.json" >"${tmp_home}/config.next"
+mv "${tmp_home}/config.next" "${tmp_home}/.kokoro-xray/config.json"
+out="$(HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
+set -euo pipefail
+source "${KOKORO_ROOT}/lib/health.sh"
+kokoro_health
+SCRIPT
+)"
+grep -q 'hy2 cc:.*bbr (configured, userspace QUIC)' <<<"$out"
+grep -q 'hy2 bbr:.*aggressive' <<<"$out"
+
+jq '.inbound.hysteria.congestion = "reno"' \
+    "${tmp_home}/.kokoro-xray/config.json" >"${tmp_home}/config.next"
+mv "${tmp_home}/config.next" "${tmp_home}/.kokoro-xray/config.json"
+out="$(HOME="$tmp_home" KOKORO_ROOT="$ROOT" bash <<'SCRIPT'
+set -euo pipefail
+source "${KOKORO_ROOT}/lib/health.sh"
+kokoro_health
+SCRIPT
+)"
+grep -q 'hy2 cc:.*reno (configured, userspace QUIC)' <<<"$out"
+! grep -q 'hy2 bbr:' <<<"$out"
 
 check_kernel() {
     local id="$1" ver="$2" release="$3" expected="$4" got

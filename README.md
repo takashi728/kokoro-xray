@@ -197,6 +197,25 @@ parallel with the selected VLESS mode and defaults to:
 Caddy disables its own HTTP/3 listener while Hysteria2 is enabled so Xray alone
 owns UDP `443`. Hysteria Realm/NAT-to-NAT mode is intentionally not configured.
 
+Hysteria2 congestion control runs in userspace over QUIC/UDP, including its
+Brutal algorithm. It does **not** need the Linux `tcp_brutal` kernel module.
+[TCP Brutal](https://github.com/HyNetworks/tcp-brutal) is a separate TCP port of
+that algorithm. Installing it, loading it, or enabling kernel TCP BBR does not
+select a Hysteria2 congestion controller. The manager therefore does not install
+or probe TCP Brutal for Hysteria2.
+
+The managed server and exported Xray client JSON explicitly select QUIC BBR
+with the aggressive profile. `status` shows that configured HY2 controller
+separately from kernel TCP tuning; it does not inspect live QUIC sessions.
+The manager currently does not render `brutalUp` / `brutalDown` bandwidth
+parameters. In the pinned Xray version, setting `congestion` to `brutal` alone
+falls back to BBR without the required rate negotiation; `force-brutal` without
+an upload rate fails config validation. Enabling Brutal properly would require
+bandwidth settings in both server/client config generation, not a kernel-module
+check. See the pinned Xray [server](https://github.com/XTLS/Xray-core/blob/v26.11.9/transport/internet/hysteria/hub.go)
+and [client](https://github.com/XTLS/Xray-core/blob/v26.11.9/transport/internet/hysteria/dialer.go)
+controller selection.
+
 ## REALITY Target Scan
 
 ```bash

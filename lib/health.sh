@@ -71,6 +71,10 @@ kokoro_health() {
         if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
             echo "hy2 domain: $(kokoro_cfg '.inbound.hysteria.domain')"
             echo "hy2 ports:  $(kokoro_cfg '.inbound.hysteria.ports')/udp"
+            echo "hy2 cc:     $(kokoro_cfg '.inbound.hysteria.congestion') (configured, userspace QUIC)"
+            if [[ "$(kokoro_cfg '.inbound.hysteria.congestion')" == "bbr" ]]; then
+                echo "hy2 bbr:    $(kokoro_cfg '.inbound.hysteria.bbr_profile')"
+            fi
         fi
         if kokoro_caddy_required; then
             echo "caddy:    $(systemctl is-active caddy 2>/dev/null || echo unknown)"
