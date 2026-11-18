@@ -38,7 +38,7 @@ jq -n -r -f "$ROOT/lib/caddy.jq" \
 jq -e '
   any(.inbounds[];
     .tag == "HYSTERIA2_IN"
-    and .port == "443,20000-20020"
+    and .port == 443
     and .streamSettings.method == "hysteria"
     and .streamSettings.finalmask.quicParams.bbrProfile == "aggressive"
     and .streamSettings.finalmask.udp[0].type == "salamander"

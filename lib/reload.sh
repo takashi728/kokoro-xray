@@ -3,6 +3,7 @@
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 source "${KOKORO_ROOT}/lib/fallback.sh"
+source "${KOKORO_ROOT}/lib/hysteria-hop.sh"
 
 kokoro_cert_path_unit() { # cert key service prefix
     local cert="$1" key="$2" prefix="$3"
@@ -84,6 +85,7 @@ kokoro_reload() {
     fi
 
     kokoro_fallback_sync || kokoro_die "fallback service synchronization failed"
+    kokoro_hysteria_hop_sync || kokoro_die "HY2 port-hopping redirect synchronization failed"
     systemctl restart xray || kokoro_die "Xray restart failed"
 
     if [[ "$role" == "edge" ]] && kokoro_caddy_required; then
