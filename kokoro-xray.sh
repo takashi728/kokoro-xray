@@ -66,7 +66,7 @@ kokoro_dispatch() {
             ;;
         reality)
             case "${1:-}" in
-                scan) shift; bash "${KOKORO_ROOT}/roles/reality-scan.sh" "$@" ;;
+                scan) shift; exec bash "${KOKORO_ROOT}/roles/reality-scan.sh" "$@" ;;
                 *) kokoro_die "usage: kokoro-xray reality scan [--apply|--select]" ;;
             esac ;;
         tune)
