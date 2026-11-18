@@ -37,6 +37,7 @@ kokoro_fallback_install() {
     kokoro_raw_tls_enabled || return 0
     kokoro_need_root
     [[ -x /usr/bin/podman ]] || kokoro_pkg_install podman
+    command -v nft >/dev/null || kokoro_pkg_install nftables
     if ! /usr/bin/podman image exists "$KOKORO_PRIVATEBIN_IMAGE"; then
         /usr/bin/podman pull "$KOKORO_PRIVATEBIN_IMAGE" || kokoro_die "failed to pull pinned PrivateBin image"
     fi
