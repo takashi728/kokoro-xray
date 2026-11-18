@@ -372,7 +372,7 @@ keeps an empty VLESS flow; RAW uses Vision with the UDP/443 client variant.
 - Caddy builds are pinned and rebuilt only when needed.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
 - UFW defaults to deny incoming and allow outgoing when firewall support is enabled.
-- XMUX uses `maxConcurrency: "5-10"` for throughput. Xray-core v26.6.27+ changed the default to `maxConnections: 6` (anti-RKN), but that limits the HTTP/2 connection pool and bottlenecks large downloads. `maxConcurrency: "5-10"` allows multiplexing within connections while keeping randomized values to avoid fingerprinting.
+- XHTTP client JSON exports explicitly use the [Xray-core v26.3.27 XMUX defaults](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/transport_internet.go#L391-L401), including `maxConcurrency: 1`. Each XMUX connection client handles one active proxied session at a time. Throughput depends on the network and workload.
 
 ## License
 

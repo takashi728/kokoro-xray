@@ -33,7 +33,10 @@ printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.realitySetti
 printf '%s\n' "$reality_json" | jq -e --arg key "$expected_pbk" '.outbounds[0].streamSettings.realitySettings.publicKey == $key' >/dev/null
 printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.realitySettings.shortId == "0123abcd"' >/dev/null
 printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.path | startswith("/")' >/dev/null
-printf '%s\n' "$reality_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings == {path:.outbounds[0].streamSettings.xhttpSettings.path}' >/dev/null
+expected_xmux='{"maxConcurrency":1,"hMaxRequestTimes":"600-900","hMaxReusableSecs":"1800-3000"}'
+printf '%s\n' "$reality_json" | jq -e --argjson xmux "$expected_xmux" '
+    .outbounds[0].streamSettings.xhttpSettings | . == {path, xmux: $xmux}
+' >/dev/null
 printf '%s\n' "$reality_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$reality_json" | jq -e '.routing.rules[-1].outboundTag == "kokoro-reality"' >/dev/null
 
@@ -61,7 +64,7 @@ printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.tlsSettings.alpn
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.mode == "auto"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e --arg encryption "$expected_encryption" '.outbounds[0].settings.vnext[0].users[0].encryption == $encryption' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xPaddingObfsMode == true' >/dev/null
-printf '%s\n' "$tls_json" | jq -e '.outbounds[0].streamSettings.xhttpSettings.xmux.maxConcurrency == "5-10"' >/dev/null
+printf '%s\n' "$tls_json" | jq -e --argjson xmux "$expected_xmux" '.outbounds[0].streamSettings.xhttpSettings.xmux == $xmux' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.dns.servers == ["https://cloudflare-dns.com/dns-query"]' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.dns.queryStrategy == "UseIP"' >/dev/null
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[0].outboundTag == "BLOCK"' >/dev/null

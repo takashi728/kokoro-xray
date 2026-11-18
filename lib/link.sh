@@ -196,17 +196,21 @@ kokoro_link_vless_json() {
         --arg encryption "$encryption" \
         --arg transport "$(kokoro_cfg '.inbound.transport // "xhttp"')" \
         '
+          def xhttp_base_settings:
+            {
+              path: $path,
+              xmux: {
+                maxConcurrency: 1,
+                hMaxRequestTimes: "600-900",
+                hMaxReusableSecs: "1800-3000"
+              }
+            };
+
           def xhttp_settings:
             if $security == "tls" then
-              {
-                path: $path,
+              xhttp_base_settings + {
                 host: $server_name,
                 mode: "auto",
-                xmux: {
-                  maxConcurrency: "5-10",
-                  hMaxRequestTimes: "600-900",
-                  hMaxReusableSecs: "1800-3000"
-                },
                 xPaddingKey: "v",
                 xPaddingBytes: "16-96",
                 xPaddingHeader: "Referer",
@@ -219,7 +223,7 @@ kokoro_link_vless_json() {
                 scMinPostsIntervalMs: 10
               }
             elif $security == "reality" then
-              {path: $path}
+              xhttp_base_settings
             else
               error("unsupported XHTTP client security: \($security)")
             end;
