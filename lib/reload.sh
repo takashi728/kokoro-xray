@@ -10,7 +10,10 @@ kokoro_cert_path_unit() { # cert key service prefix
         '[Path]' \
         "PathChanged=${cert}" \
         "PathChanged=${key}" \
-        "Unit=kokoro-${prefix}-cert-reload.service"
+        "Unit=kokoro-${prefix}-cert-reload.service" \
+        '' \
+        '[Install]' \
+        'WantedBy=multi-user.target'
 }
 
 kokoro_cert_service_unit() {

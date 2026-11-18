@@ -43,6 +43,7 @@ service_unit="${unit_dir}/kokoro-hysteria-cert-reload.service"
 grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.crt" "$path_unit"
 grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.key" "$path_unit"
 grep -qx 'Unit=kokoro-hysteria-cert-reload.service' "$path_unit"
+grep -qx 'WantedBy=multi-user.target' "$path_unit"
 grep -qx 'ExecStart=/usr/bin/systemctl restart xray.service' "$service_unit"
 grep -qx 'enable --now kokoro-hysteria-cert.path' "${TMP}/systemctl.log"
 
@@ -79,6 +80,7 @@ HOME="$TMP" KOKORO_ROOT="$ROOT" KOKORO_TEST_HYSTERIA_CERT_ROOT="$cert_root" \
 '
 grep -qx "PathChanged=${cert_root}/issuer/example.com/example.com.crt" "${unit_dir}/kokoro-tls-cert.path"
 grep -qx 'Unit=kokoro-tls-cert-reload.service' "${unit_dir}/kokoro-tls-cert.path"
+grep -qx 'WantedBy=multi-user.target' "${unit_dir}/kokoro-tls-cert.path"
 grep -qx 'enable --now kokoro-tls-cert.path' "${TMP}/systemctl.log"
 
 echo "reload-test OK"
