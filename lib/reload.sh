@@ -2,20 +2,21 @@
 # kokoro-xray — restart services based on role/mode
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
+source "${KOKORO_ROOT}/lib/fallback.sh"
 
-kokoro_hysteria_cert_path_unit() { # cert key
-    local cert="$1" key="$2"
+kokoro_cert_path_unit() { # cert key service prefix
+    local cert="$1" key="$2" prefix="$3"
     printf '%s\n' \
         '[Path]' \
         "PathChanged=${cert}" \
         "PathChanged=${key}" \
-        'Unit=kokoro-hysteria-cert-reload.service'
+        "Unit=kokoro-${prefix}-cert-reload.service"
 }
 
-kokoro_hysteria_cert_service_unit() {
+kokoro_cert_service_unit() {
     printf '%s\n' \
         '[Unit]' \
-        'Description=Restart Xray after Hysteria2 certificate renewal' \
+        'Description=Restart Xray after managed TLS certificate renewal' \
         'After=xray.service' \
         '' \
         '[Service]' \
@@ -24,32 +25,37 @@ kokoro_hysteria_cert_service_unit() {
         'ExecStart=/usr/bin/systemctl restart xray.service'
 }
 
-kokoro_hysteria_cert_reload_sync() {
-    local cert key enabled unit_dir path_unit service_unit changed=false
-    enabled="$(kokoro_cfg '.inbound.hysteria.enabled // false')"
+kokoro_cert_reload_sync() {
+    local prefix="$1" cert key enabled=false unit_dir path_unit service_unit changed=false
+    case "$prefix" in
+        hysteria) enabled="$(kokoro_cfg '.inbound.hysteria.enabled // false')" ;;
+        tls) if kokoro_raw_tls_enabled; then enabled=true; fi ;;
+        *) kokoro_die "invalid certificate watcher prefix" ;;
+    esac
     unit_dir="$(kokoro_systemd_unit_dir)"
-    path_unit="${unit_dir}/kokoro-hysteria-cert.path"
-    service_unit="${unit_dir}/kokoro-hysteria-cert-reload.service"
+    path_unit="${unit_dir}/kokoro-${prefix}-cert.path"
+    service_unit="${unit_dir}/kokoro-${prefix}-cert-reload.service"
 
     if [[ "$enabled" != "true" ]]; then
         if [[ -e "$path_unit" || -e "$service_unit" ]]; then
+            systemctl disable --now "kokoro-${prefix}-cert.path" >/dev/null 2>&1 || true
             rm -f "$path_unit" "$service_unit"
             changed=true
         fi
     else
-        cert="$(kokoro_cfg '.paths.hysteria_cert')"
-        key="$(kokoro_cfg '.paths.hysteria_key')"
-        kokoro_require_hysteria_file '.paths.hysteria_cert' '.crt'
-        kokoro_require_hysteria_file '.paths.hysteria_key' '.key'
+        cert="$(kokoro_cfg ".paths.${prefix}_cert")"
+        key="$(kokoro_cfg ".paths.${prefix}_key")"
+        kokoro_require_hysteria_file ".paths.${prefix}_cert" '.crt'
+        kokoro_require_hysteria_file ".paths.${prefix}_key" '.key'
         local path_content service_content
-        path_content="$(kokoro_hysteria_cert_path_unit "$cert" "$key")"
-        service_content="$(kokoro_hysteria_cert_service_unit)"
+        path_content="$(kokoro_cert_path_unit "$cert" "$key" "$prefix")"
+        service_content="$(kokoro_cert_service_unit)"
         if [[ "$path_content" != "$(cat "$path_unit" 2>/dev/null || true)" ]]; then
-            kokoro_install_systemd_unit kokoro-hysteria-cert.path "$path_content"
+            kokoro_install_systemd_unit "kokoro-${prefix}-cert.path" "$path_content"
             changed=true
         fi
         if [[ "$service_content" != "$(cat "$service_unit" 2>/dev/null || true)" ]]; then
-            kokoro_install_systemd_unit kokoro-hysteria-cert-reload.service "$service_content"
+            kokoro_install_systemd_unit "kokoro-${prefix}-cert-reload.service" "$service_content"
             changed=true
         fi
     fi
@@ -58,12 +64,12 @@ kokoro_hysteria_cert_reload_sync() {
         systemctl daemon-reload
     fi
     if [[ "$enabled" == "true" ]]; then
-        systemctl enable --now kokoro-hysteria-cert.path >/dev/null 2>&1 ||
-            kokoro_warn "failed to start Hysteria2 certificate renewal watcher"
-    else
-        systemctl disable kokoro-hysteria-cert.path >/dev/null 2>&1 || true
+        systemctl enable --now "kokoro-${prefix}-cert.path" >/dev/null 2>&1 ||
+            kokoro_warn "failed to start ${prefix} certificate renewal watcher"
     fi
 }
+
+kokoro_hysteria_cert_reload_sync() { kokoro_cert_reload_sync hysteria; }
 
 kokoro_reload() {
     kokoro_need_root
@@ -74,11 +80,12 @@ kokoro_reload() {
         systemctl disable --now caddy >/dev/null 2>&1 || true
     fi
 
-    systemctl restart xray
+    kokoro_fallback_sync || kokoro_die "fallback service synchronization failed"
+    systemctl restart xray || kokoro_die "Xray restart failed"
 
     if [[ "$role" == "edge" ]] && kokoro_caddy_required; then
         systemctl enable caddy >/dev/null 2>&1 || true
-        systemctl restart caddy
+        systemctl restart caddy || kokoro_die "Caddy restart failed"
     fi
 
     if [[ "$role" == "exit" && "$(kokoro_cfg '.tor.enabled')" == "true" ]]; then
@@ -87,4 +94,5 @@ kokoro_reload() {
     fi
 
     kokoro_hysteria_cert_reload_sync
+    kokoro_cert_reload_sync tls
 }

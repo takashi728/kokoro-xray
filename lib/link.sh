@@ -5,6 +5,10 @@
 source "${KOKORO_ROOT}/lib/common.sh"
 
 kokoro_link_vless_encryption() {
+    if [[ "${1:-}" == tls ]] && kokoro_raw_tls_enabled; then
+        printf 'none\n'
+        return 0
+    fi
     if [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled // false')" == "true" ]]; then
         kokoro_sec '.inbound.vless_encryption.encryption'
     else
@@ -27,9 +31,14 @@ kokoro_link_tls_url() {
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 0
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
-    cdn="$(kokoro_cfg '.inbound.tls.cdn_domain')"
-    encryption="$(kokoro_link_vless_encryption)"
+    cdn="$(kokoro_tls_domain)"
+    encryption="$(kokoro_link_vless_encryption tls)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 0
+    if [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw ]]; then
+        printf 'vless://%s@%s:443?encryption=%s&security=tls&type=tcp&flow=xtls-rprx-vision-udp443&sni=%s&fp=chrome&alpn=h2%%2Chttp%%2F1.1#kokoro-raw-tls\n' \
+            "$uuid" "$cdn" "$encryption" "$cdn"
+        return 0
+    fi
     printf 'vless://%s@%s:443?encryption=%s&security=tls&type=xhttp&path=%s&host=%s&sni=%s&fp=chrome&alpn=h2#kokoro-tls\n' \
         "$uuid" "$cdn" "$encryption" "$path" "$cdn" "$cdn"
 }
@@ -46,6 +55,12 @@ kokoro_link_reality_url() {
     sid="$(kokoro_sec '.inbound.reality.short_ids[0]')"
     encryption="$(kokoro_link_vless_encryption)"
     host="$(kokoro_link_public_address)"
+    if [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw ]]; then
+        [[ "$host" == *:* ]] && host="[$host]"
+        printf 'vless://%s@%s:443?encryption=%s&security=reality&type=tcp&flow=xtls-rprx-vision-udp443&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-raw-reality\n' \
+            "$uuid" "$host" "$encryption" "$pub" "$sni" "$sid"
+        return 0
+    fi
     printf 'vless://%s@%s:443?encryption=%s&security=reality&type=xhttp&path=%s&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-reality\n' \
         "$uuid" "$host" "$encryption" "$path" "$pub" "$sni" "$sid"
 }
@@ -165,7 +180,7 @@ kokoro_link_hysteria_json() {
         }'
 }
 
-kokoro_link_xhttp_json() {
+kokoro_link_vless_json() {
     local address="$1" tag="$2" security="$3" server_name="$4"
     local public_key="$5" short_id="$6" path="$7" uuid="$8" encryption="$9"
 
@@ -179,6 +194,7 @@ kokoro_link_xhttp_json() {
         --arg path "$path" \
         --arg uuid "$uuid" \
         --arg encryption "$encryption" \
+        --arg transport "$(kokoro_cfg '.inbound.transport // "xhttp"')" \
         '
           def xhttp_base_settings:
             {
@@ -215,18 +231,17 @@ kokoro_link_xhttp_json() {
           def stream_settings:
             if $security == "tls" then
               {
-                network: "xhttp",
+                network: $transport,
                 security: "tls",
                 tlsSettings: {
                   serverName: $server_name,
                   fingerprint: "chrome",
-                  alpn: ["h2"]
-                },
-                xhttpSettings: xhttp_settings
-              }
+                  alpn: (if $transport == "raw" then ["h2", "http/1.1"] else ["h2"] end)
+                }
+              } + (if $transport == "xhttp" then {xhttpSettings: xhttp_settings} else {} end)
             elif $security == "reality" then
               {
-                network: "xhttp",
+                network: $transport,
                 security: "reality",
                 realitySettings: {
                   serverName: $server_name,
@@ -234,9 +249,8 @@ kokoro_link_xhttp_json() {
                   publicKey: $public_key,
                   shortId: $short_id,
                   spiderX: "/"
-                },
-                xhttpSettings: xhttp_settings
-              }
+                }
+              } + (if $transport == "xhttp" then {xhttpSettings: xhttp_settings} else {} end)
             else
               error("unsupported XHTTP client security: \($security)")
             end;
@@ -355,7 +369,7 @@ kokoro_link_xhttp_json() {
                         {
                           id: $uuid,
                           encryption: $encryption,
-                          flow: ""
+                          flow: (if $transport == "raw" then "xtls-rprx-vision-udp443" else "" end)
                         }
                       ]
                     }
@@ -381,11 +395,11 @@ kokoro_link_tls_json() {
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 1
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
-    cdn="$(kokoro_cfg '.inbound.tls.cdn_domain')"
-    encryption="$(kokoro_link_vless_encryption)"
+    cdn="$(kokoro_tls_domain)"
+    encryption="$(kokoro_link_vless_encryption tls)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 1
 
-    kokoro_link_xhttp_json "$cdn" "kokoro-tls" "tls" "$cdn" "" "" \
+    kokoro_link_vless_json "$cdn" "kokoro-tls" "tls" "$cdn" "" "" \
         "$path" "$uuid" "$encryption"
 }
 
@@ -401,10 +415,11 @@ kokoro_link_reality_json() {
     short_id="$(kokoro_sec '.inbound.reality.short_ids[0]')"
     encryption="$(kokoro_link_vless_encryption)"
     address="$(kokoro_link_public_address)"
-    [[ -n "$uuid" && -n "$path" && -n "$sni" && -n "$public_key" && -n "$short_id" ]] ||
+    [[ -n "$uuid" && -n "$sni" && -n "$public_key" && -n "$short_id" ]] ||
         return 1
+    [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw || -n "$path" ]] || return 1
 
-    kokoro_link_xhttp_json "$address" "kokoro-reality" "reality" "$sni" \
+    kokoro_link_vless_json "$address" "kokoro-reality" "reality" "$sni" \
         "$public_key" "$short_id" "$path" "$uuid" "$encryption"
 }
 

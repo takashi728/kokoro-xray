@@ -35,6 +35,19 @@ Generated systemd units are syntax-safe and verified before installation.
 | `tls` | — | Caddy L7 | Caddy |
 | `both` | Xray `127.0.0.1:8443` | Caddy L4 SNI split | Caddy (xcaddy + caddy-l4) |
 
+`.inbound.transport` selects `xhttp` (migration default) or `raw` (interactive
+CN performance preset). RAW REALITY shares the existing target selection and
+public/loopback listener layout. RAW TLS always uses Caddy L4 SNI passthrough
+to loopback Xray TLS on 8444; certificate automation remains in Caddy, while
+Xray owns the TLS session required by Vision. Server users use
+`xtls-rprx-vision`; client users use `xtls-rprx-vision-udp443`.
+
+RAW TLS fallback sends decrypted HTTP/1.1 or HTTP/2 to Caddy's loopback h1/h2c
+listener on 8080, then to the PrivateBin Podman service on loopback 8081.
+REALITY fallback continues to use the verified remote target, never PrivateBin.
+PrivateBin is a pinned, non-root, read-only container with bounded tmpfs data.
+Separate TLS and HY2 certificate watchers restart Xray when their files change.
+
 Caddy overwrites `Kokoro-Trusted-XFF` on TLS proxy requests. Xray trusts
 `X-Forwarded-For` only when that marker arrives over its loopback listener.
 

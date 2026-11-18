@@ -40,7 +40,9 @@ jobs:
       - name: Run state tests
         run: bash .github/scripts/state-test.sh
       - name: Run reload tests
-        run: bash tests/reload.sh
+        run: |
+          bash tests/reload.sh
+          bash tests/certificate-bootstrap.sh
       - name: Run audit remediation tests
         run: |
           bash tests/security.sh
@@ -54,5 +56,7 @@ jobs:
           unzip -q /tmp/kokoro-xray-ci/xray.zip -d /tmp/kokoro-xray-ci
       - name: Run Hysteria2 tests
         run: XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
+      - name: Run RAW Vision tests
+        run: PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
       - name: Live REALITY probe (github.com)
         run: KOKORO_LIVE_SCAN=1 bash .github/scripts/reality-scan-test.sh

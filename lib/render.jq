@@ -4,6 +4,9 @@
 def cfg: $cfg[0];
 def sec: $sec[0];
 def mode: cfg.inbound.mode;
+def transport: cfg.inbound.transport // "xhttp";
+def raw: transport == "raw";
+def flow: if raw then "xtls-rprx-vision" else "" end;
 def role: cfg.role;
 def hysteria_enabled: cfg.inbound.hysteria.enabled;
 def outbound_proxy: sec.outbound_proxy;
@@ -39,16 +42,16 @@ def xhttp_tls_settings: xhttp_base_settings + {
 };
 
 def reality_inbound: {
-  tag: "REALITY_XHTTP_IN",
+  tag: (if raw then "REALITY_RAW_IN" else "REALITY_XHTTP_IN" end),
   listen: reality_listen,
   port: reality_port,
   protocol: "vless",
   settings: {
-    clients: [{ id: sec.inbound.uuid, flow: "" }],
+    clients: [{ id: sec.inbound.uuid, flow: flow }],
     decryption: vless_decryption
   },
   streamSettings: {
-    network: "xhttp",
+    network: transport,
     security: "reality",
     realitySettings: {
       show: false,
@@ -57,29 +60,36 @@ def reality_inbound: {
       serverNames: cfg.inbound.reality.server_names,
       privateKey: sec.inbound.reality.private_key,
       shortIds: sec.inbound.reality.short_ids
-    },
-    xhttpSettings: xhttp_base_settings,
-    sockopt: reality_sockopt
-  },
-  sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+    }
+  } + (if raw then {} else {xhttpSettings: xhttp_base_settings, sockopt: reality_sockopt} end),
+  sniffing: ({ enabled: true, destOverride: ["http", "tls", "quic"] }
+    + if raw then {routeOnly: true} else {} end)
 };
 
 def tls_inbound: {
-  tag: "TLS_XHTTP_IN",
+  tag: (if raw then "TLS_RAW_IN" else "TLS_XHTTP_IN" end),
   listen: "127.0.0.1",
   port: 8444,
   protocol: "vless",
   settings: {
-    clients: [{ id: sec.inbound.uuid, flow: "" }],
-    decryption: vless_decryption
-  },
-  streamSettings: {
-    network: "xhttp",
+    clients: [{ id: sec.inbound.uuid, flow: flow }],
+    decryption: (if raw then "none" else vless_decryption end)
+  } + (if raw then {fallbacks: [{dest: "127.0.0.1:8080", xver: 0}]} else {} end),
+  streamSettings: (if raw then {
+    network: "raw",
+    security: "tls",
+    tlsSettings: {
+      alpn: ["h2", "http/1.1"],
+      certificates: [{certificateFile: cfg.paths.tls_cert, keyFile: cfg.paths.tls_key}]
+    }
+  } else {
+    network: transport,
     security: "none",
     xhttpSettings: xhttp_tls_settings,
     sockopt: tls_sockopt
-  },
-  sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] }
+  } end),
+  sniffing: ({ enabled: true, destOverride: ["http", "tls", "quic"] }
+    + if raw then {routeOnly: true} else {} end)
 };
 
 def hysteria_inbound: {

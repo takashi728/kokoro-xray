@@ -28,14 +28,12 @@ kokoro_validate() {
     kokoro_validate_geo || return 1
     "$xray_bin" run -test -config "$cfg" || { kokoro_warn "xray config test failed"; return 1; }
 
-    if [[ "$role" == "edge" ]] && kokoro_caddy_required && [[ -f "$caddyfile" ]]; then
+    if [[ "$role" == "edge" ]] && kokoro_caddy_required; then
         local caddy_bin
         caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
-        if [[ -x "$caddy_bin" ]]; then
-            "$caddy_bin" validate --config "$caddyfile" || { kokoro_warn "caddy validate failed"; return 1; }
-        else
-            kokoro_warn "caddy binary not found — skipping caddy validate"
-        fi
+        [[ -f "$caddyfile" ]] || { kokoro_warn "missing caddy config: $caddyfile"; return 1; }
+        [[ -x "$caddy_bin" ]] || { kokoro_warn "caddy binary not found: $caddy_bin"; return 1; }
+        "$caddy_bin" validate --config "$caddyfile" || { kokoro_warn "caddy validate failed"; return 1; }
     fi
 
     kokoro_log "validation passed"

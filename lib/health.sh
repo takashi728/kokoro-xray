@@ -52,6 +52,7 @@ kokoro_health() {
 
     echo "role:     $(kokoro_cfg '.role')"
     echo "mode:     $(kokoro_cfg '.inbound.mode')"
+    echo "transport: $(kokoro_cfg '.inbound.transport // "xhttp"')"
     echo "xray:     $(systemctl is-active xray 2>/dev/null || echo unknown)"
 
     if [[ -f "${KOKORO_ROOT}/lib/network-tune.sh" ]]; then
@@ -68,6 +69,10 @@ kokoro_health() {
         kokoro_health_kernel_cve
         echo "vless enc: $(kokoro_cfg '.inbound.vless_encryption.enabled // false')"
         echo "hysteria:  $(kokoro_cfg '.inbound.hysteria.enabled // false')"
+        if kokoro_raw_tls_enabled; then
+            echo "fallback: $(systemctl is-active kokoro-fallback.service 2>/dev/null || echo unknown)"
+            echo "raw TLS:  TLS + Vision; VLESS payload encryption off (fallback requirement)"
+        fi
         if [[ "$(kokoro_cfg '.inbound.hysteria.enabled // false')" == "true" ]]; then
             echo "hy2 domain: $(kokoro_cfg '.inbound.hysteria.domain')"
             echo "hy2 ports:  $(kokoro_cfg '.inbound.hysteria.ports')/udp"
@@ -75,7 +80,7 @@ kokoro_health() {
         if kokoro_caddy_required; then
             echo "caddy:    $(systemctl is-active caddy 2>/dev/null || echo unknown)"
         fi
-        if [[ "$mode" == "tls" ]]; then
+        if [[ "$mode" == "tls" && "$(kokoro_cfg '.inbound.transport // "xhttp"')" == xhttp ]]; then
             echo
             echo -e "${YELLOW}${BOLD}TLS mode client note${NC}"
             echo -e "${RED}Please use HApp or another client that supports JSON copy-paste input.${NC}"
