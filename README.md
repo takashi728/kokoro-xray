@@ -258,6 +258,9 @@ parallel with the selected VLESS mode and defaults to:
 - Real Let's Encrypt certificate managed by Caddy
 - Automatic Xray restart after Caddy renews that certificate
 - UDP port hopping across `443,20000-20020`
+- One QUIC listener on the first port; IPv4/IPv6 NAT redirects the other ports
+  to it. `kokoro-hysteria-hop.service` restores these rules at boot and removes
+  them when HY2 is disabled. This is a oneshot, not a resident daemon.
 - Salamander packet obfuscation (upstream's Gecko mode is not enabled)
 - BBR with the aggressive profile
 - HTTP/3 masquerade proxying to the selected public website

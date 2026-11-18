@@ -60,7 +60,9 @@ jobs:
           printf '%s  %s\n' b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82 /tmp/kokoro-xray-ci/xray.zip | sha256sum -c -
           unzip -q /tmp/kokoro-xray-ci/xray.zip -d /tmp/kokoro-xray-ci
       - name: Run Hysteria2 tests
-        run: XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
+        run: |
+          XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
+          bash tests/hysteria-hop.sh
       - name: Run RAW Vision tests
         run: PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
       - name: Live REALITY probe (github.com)

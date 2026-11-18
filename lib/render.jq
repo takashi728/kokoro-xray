@@ -99,7 +99,7 @@ def tls_inbound: {
 def hysteria_inbound: {
   tag: "HYSTERIA2_IN",
   listen: "0.0.0.0",
-  port: cfg.inbound.hysteria.ports,
+  port: (cfg.inbound.hysteria.ports | split(",")[0] | split("-")[0] | tonumber),
   protocol: "hysteria",
   settings: {
     version: 2,
