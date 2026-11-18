@@ -7,7 +7,7 @@ kokoro_render_xray() {
     local out tmp
     kokoro_validate_service_paths
     out="$(kokoro_cfg '.paths.xray_config')"
-    install -d "$(dirname "$out")"
+    install -d "$(dirname "$out")" || return 1
     tmp="$(mktemp "${out}.XXXXXX")" || return 1
     if ! jq -n -f "${KOKORO_ROOT}/lib/render.jq" \
         --slurpfile cfg "${KOKORO_CONFIG}" \
@@ -19,16 +19,20 @@ kokoro_render_xray() {
 }
 
 kokoro_render_caddy() {
-    local out
+    local out staged
     kokoro_caddy_required || return 0
     kokoro_validate_service_paths
     out="$(kokoro_cfg '.paths.caddyfile')"
-    install -d "$(dirname "$out")"
-    jq -n -r -f "${KOKORO_ROOT}/lib/caddy.jq" \
+    install -d "$(dirname "$out")" || return 1
+    staged="$(mktemp "${out}.XXXXXX")" || return 1
+    if ! jq -n -r -f "${KOKORO_ROOT}/lib/caddy.jq" \
         --slurpfile cfg "${KOKORO_CONFIG}" \
         --slurpfile sec "${KOKORO_SECRETS}" \
-        >"${out}.tmp"
-    mv "${out}.tmp" "$out"
+        >"$staged"; then
+        rm -f "$staged"
+        return 1
+    fi
+    mv "$staged" "$out" || { rm -f "$staged"; return 1; }
 }
 
 kokoro_render() {

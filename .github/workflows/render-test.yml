@@ -14,7 +14,9 @@ jobs:
       - name: Install jq
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap jq
       - name: Run render tests
-        run: bash .github/scripts/render-test.sh
+        run: |
+          bash .github/scripts/render-test.sh
+          bash tests/render-failure.sh
       - name: Run download verification tests
         run: bash .github/scripts/download-verify-test.sh
       - name: Run Caddy Go tests
