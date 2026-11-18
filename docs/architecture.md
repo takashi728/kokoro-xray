@@ -60,7 +60,12 @@ migrate with this layer disabled to avoid breaking deployed clients.
 `kokoro-xray reality scan` probes `data/reality-seeds.txt` plus optional `--domains` / `--file`.
 Each host is validated (not bulk-imported): TLS 1.3, ALPN h2, cert SAN, redirect rules.
 Rejects Apple/iCloud/Microsoft names and `.cn`/`.ru`/`.ir` TLDs per Xray-core.
-Scores by latency + OCSP bonus.
+Requires matching BGP origin ASNs for all locally resolved target addresses,
+using RIPEstat and the VPS public IP. PTR suffixes add provider-domain hints.
+TLS probes use a verified target IP; selection rechecks and pins that IP as the
+REALITY destination. Manual onboarding uses the same checks. There is no
+cross-ASN fallback. Results sort by TLS latency, then compatibility score.
+This selection logic is independent of XHTTP versus a future RAW transport.
 
 ## Multi-node pairing
 

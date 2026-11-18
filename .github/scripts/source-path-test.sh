@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-for lib in apply caddy cf geodata health keys os preflight reload render snapshot tor validate vless-encryption xray; do
+for lib in apply caddy cf geodata health keys os preflight reality-asn reality-scan reload render snapshot tor validate vless-encryption xray; do
     bash -c "source '${ROOT}/lib/${lib}.sh'" "${ROOT}/roles/edge.sh"
 done
 

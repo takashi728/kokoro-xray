@@ -206,7 +206,39 @@ kokoro-xray reality scan --apply
 sudo kokoro-xray apply
 ```
 
-The scanner checks DNS, TLS 1.3, ALPN `h2`, certificate coverage, and redirect behavior.
+The scanner requires the target's locally resolved addresses to announce from
+the VPS's ASN. RIPEstat supplies BGP origin-ASN data over HTTPS. The VPS's public
+IPv4 is detected over HTTPS; set `KOKORO_PUBLIC_ADDRESS` to its literal public IP
+when detection does not represent the address clients use. A transit/upstream
+ASN is not the same thing as the prefix's announcing ASN.
+
+Candidates come from curated seeds, the current SNI, VPS PTR suffixes, and
+`--domains` / `--file`. PTR names are hints, not proof. There is no complete
+public ASN-to-website directory; a provider may have no suitable target among
+these candidates. Supply known provider-hosted websites if discovery finds none.
+You do not need to own those domains. Unknown, mixed, or mismatching ASNs stop
+selection; the installer does not silently fall back to a popular CDN target.
+
+Matching candidates must also pass TLS 1.3 with certificate/hostname verification,
+ALPN `h2`, certificate SAN coverage, and redirect checks. Candidates are ranked
+by measured TLS handshake latency, then score. Selecting a target rechecks it
+and pins the tested IP as `dest`, keeping the domain as SNI. Manual onboarding
+uses the same checks. Rescan when the target IP changes. Existing configurations
+are not rewritten automatically; rerun `reality scan --select` and `apply` to
+replace an older target. ASN lookups happen during selection, not on every apply.
+Noninteractive `edge` setup also checks its configured SNI before installation;
+preconfigure a suitable domain instead of relying on the generic default.
+
+This follows [upstream REALITY target guidance](https://github.com/XTLS/Xray-docs-next/blob/main/docs/en/config/transports/reality.md).
+Same-ASN selection reduces one inconsistency; it is not proof against GFW
+detection or a guarantee that the SNI resolves identically inside China.
+RIPEstat sees the queried public IPs. No credentials are sent.
+
+The selection checks apply to REALITY independently of its transport. This
+project currently emits XHTTP REALITY with an empty VLESS flow. A future RAW
+profile can reuse selection, but must use the actual Vision flow names:
+`xtls-rprx-vision` on the server and optionally `xtls-rprx-vision-udp443` on the
+client to permit UDP/443. `xtls-rprx-upd443` is not a valid flow name.
 
 ## Files
 

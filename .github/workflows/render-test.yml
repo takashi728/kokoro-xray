@@ -22,7 +22,9 @@ jobs:
       - name: Run Caddy tuning tests
         run: bash .github/scripts/caddy-tune-test.sh
       - name: Run reality-scan tests
-        run: bash .github/scripts/reality-scan-test.sh
+        run: |
+          bash .github/scripts/reality-scan-test.sh
+          bash tests/reality-asn.sh
       - name: Run network-tune tests
         run: bash .github/scripts/network-tune-test.sh
       - name: Run link tests

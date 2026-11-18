@@ -4,10 +4,36 @@
 : "${KOKORO_ROOT:=$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)}"
 source "${KOKORO_ROOT}/lib/common.sh"
 
+kokoro_onboard_reality_target() {
+    local do_scan="$1" sni
+    source "${KOKORO_ROOT}/lib/reality-scan.sh"
+    if [[ "$do_scan" == "true" ]]; then
+        if kokoro_reality_scan --limit 10 --select; then
+            kokoro_log "REALITY target set from scan"
+            return 0
+        fi
+        kokoro_warn "scan found no verified same-ASN target"
+    fi
+    while read -r -p "Provider-hosted REALITY domain (ownership not required; empty cancels): " sni; do
+        [[ -n "$sni" ]] || return 1
+        if kokoro_reality_apply_host "$sni"; then
+            return 0
+        fi
+        kokoro_warn "choose another domain hosted in this VPS's ASN"
+    done
+    return 1
+}
+
 kokoro_onboard_edge() {
-    local mode cdn email sni dest hy_answer hy_enabled hy_domain hy_ports hy_masquerade
+    local mode cdn email hy_answer hy_enabled hy_domain hy_ports hy_masquerade
 
     if [[ ! -t 0 ]]; then
+        mode="$(kokoro_cfg '.inbound.mode')"
+        if [[ "$mode" == "reality" || "$mode" == "both" ]]; then
+            source "${KOKORO_ROOT}/lib/reality-scan.sh"
+            kokoro_reality_apply_host "$(kokoro_cfg '.inbound.reality.server_names[0]')" ||
+                kokoro_die "noninteractive REALITY setup requires a verified same-ASN target"
+        fi
         return 0
     fi
 
@@ -25,7 +51,7 @@ kokoro_onboard_edge() {
     fi
 
     if [[ "$mode" == "reality" || "$mode" == "both" ]]; then
-        local do_scan=false scan_args=()
+        local do_scan=false
         if [[ "${KOKORO_APPLY_EDGE:-}" == "true" ]]; then
             do_scan=true
             kokoro_log "scanning REALITY targets (--apply-edge)..."
@@ -34,33 +60,8 @@ kokoro_onboard_edge() {
             [[ ! "$scan_ans" =~ ^[Nn]$ ]] && do_scan=true
         fi
 
-        if [[ "$do_scan" == "true" ]]; then
-            # shellcheck source=lib/reality-scan.sh
-            source "${KOKORO_ROOT}/lib/reality-scan.sh"
-            if [[ -t 0 ]]; then
-                scan_args=(--limit 10 --select)
-            else
-                scan_args=(--limit 10 --apply)
-            fi
-            if kokoro_reality_scan "${scan_args[@]}"; then
-                kokoro_log "REALITY target set from scan"
-            else
-                kokoro_warn "scan found no valid targets — enter manually"
-                read -r -p "REALITY SNI [www.sky.com]: " sni
-                sni="${sni:-www.sky.com}"
-                kokoro_cfg_set '.inbound.reality.server_names' "[\"${sni}\"]"
-                read -r -p "REALITY dest [${sni}:443]: " dest
-                dest="${dest:-${sni}:443}"
-                kokoro_cfg_set_str '.inbound.reality.dest' "$dest"
-            fi
-        else
-            read -r -p "REALITY SNI [www.sky.com]: " sni
-            sni="${sni:-www.sky.com}"
-            kokoro_cfg_set '.inbound.reality.server_names' "[\"${sni}\"]"
-            read -r -p "REALITY dest [${sni}:443]: " dest
-            dest="${dest:-${sni}:443}"
-            kokoro_cfg_set_str '.inbound.reality.dest' "$dest"
-        fi
+        kokoro_onboard_reality_target "$do_scan" ||
+            kokoro_die "REALITY setup stopped without a verified same-ASN target"
     fi
 
     hy_enabled="$(kokoro_cfg '.inbound.hysteria.enabled // false')"
