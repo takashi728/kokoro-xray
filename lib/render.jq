@@ -54,7 +54,7 @@ def reality_inbound: {
     clients: [{ id: sec.inbound.uuid, flow: flow }],
     decryption: vless_decryption
   },
-  streamSettings: {
+  streamSettings: ({
     network: transport,
     security: "reality",
     realitySettings: {
@@ -65,7 +65,7 @@ def reality_inbound: {
       privateKey: sec.inbound.reality.private_key,
       shortIds: sec.inbound.reality.short_ids
     }
-  } + (if raw then {} else {xhttpSettings: xhttp_base_settings, sockopt: reality_sockopt} end),
+  } + (if raw then {} else {xhttpSettings: xhttp_base_settings, sockopt: reality_sockopt} end)),
   sniffing: ({ enabled: true, destOverride: ["http", "tls", "quic"] }
     + if raw then {routeOnly: true} else {} end)
 };
@@ -75,10 +75,10 @@ def tls_inbound: {
   listen: "127.0.0.1",
   port: 8444,
   protocol: "vless",
-  settings: {
+  settings: ({
     clients: [{ id: sec.inbound.uuid, flow: flow }],
     decryption: (if raw then "none" else vless_decryption end)
-  } + (if raw then {fallbacks: [{dest: "127.0.0.1:8080", xver: 0}]} else {} end),
+  } + (if raw then {fallbacks: [{dest: "127.0.0.1:8080", xver: 0}]} else {} end)),
   streamSettings: (if raw then {
     network: "raw",
     security: "tls",

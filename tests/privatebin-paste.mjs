@@ -4,11 +4,12 @@ import { randomBytes, webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import https from 'node:https';
 
-const ca = readFileSync(process.env.PRIVATEBIN_TEST_CA);
+const target = new URL(process.env.PRIVATEBIN_TEST_URL || 'https://direct.example:14443');
+const ca = process.env.PRIVATEBIN_TEST_CA ? readFileSync(process.env.PRIVATEBIN_TEST_CA) : undefined;
 const request = (method, path, body) => new Promise((resolve, reject) => {
   const req = https.request({
-    hostname: 'direct.example', port: 14443, path, method, ca,
-    lookup: (_host, options, callback) => {
+    hostname: target.hostname, port: target.port || 443, path, method, ca,
+    lookup: process.env.PRIVATEBIN_TEST_URL ? undefined : (_host, options, callback) => {
       if (options.all) callback(null, [{ address: '127.0.0.1', family: 4 }]);
       else callback(null, '127.0.0.1', 4);
     },
