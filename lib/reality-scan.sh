@@ -57,6 +57,7 @@ kokoro_reality_bad_redirect() {
     [[ "$ip" == *:* ]] && ip="[$ip]"
     headers="$(timeout 5 curl --noproxy '*' -sI --max-time 5 --max-redirs 0 \
         --resolve "${host}:443:${ip}" "https://${host}/" 2>/dev/null)" || return 2
+    kokoro_reality_cdn_headers_detected "$headers" && return 3
     code="$(awk '$1 ~ /^HTTP\// {print $2; exit}' <<<"$headers")"
     loc="$(awk 'tolower($1)=="location:" {print $2; exit}' <<<"$headers" | tr -d '\r')"
     [[ "$code" =~ ^30[1278]$ ]] || return 1
@@ -78,7 +79,7 @@ kokoro_reality_has_ocsp() {
 
 kokoro_reality_validate_one() {
     local host="$1"
-    local latency=0 score=0 tags="" log ip redirect_status
+    local latency=0 score=0 tags="" log ip redirect_status target_status
 
     host="$(kokoro_reality_normalize_host "$host")"
     if [[ ! "$host" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
@@ -91,8 +92,13 @@ kokoro_reality_validate_one() {
         return
     fi
 
-    if ! ip="$(kokoro_reality_target_ip "$host")"; then
-        printf 'FAIL\t0\t0\tasn-mismatch-or-unknown\t%s\n' "$host"
+    if ip="$(kokoro_reality_target_ip "$host")"; then
+        :
+    else
+        target_status=$?
+        if [[ "$target_status" == 2 ]]; then tags="cdn-or-unverified"
+        else tags="asn-mismatch-or-unknown"; fi
+        printf 'FAIL\t0\t0\t%s\t%s\n' "$tags" "$host"
         return
     fi
 
@@ -121,7 +127,7 @@ kokoro_reality_validate_one() {
         return
     fi
     rm -f "$log"
-    tags="tls1.3,h2,same-asn"
+    tags="tls1.3,h2,same-asn,cdn-screened"
     score=40
 
     if kokoro_reality_cert_covers_host "$host" "$ip"; then
@@ -137,6 +143,10 @@ kokoro_reality_validate_one() {
         return
     else
         redirect_status=$?
+        if [[ "$redirect_status" == 3 ]]; then
+            printf 'FAIL\t%s\t0\tcdn-header\t%s\n' "$latency" "$host"
+            return
+        fi
         if [[ "$redirect_status" -ne 1 ]]; then
             printf 'FAIL\t%s\t0\thttps-check-fail\t%s\n' "$latency" "$host"
             return
@@ -282,9 +292,11 @@ kokoro-xray reality scan — validate REALITY targets
 
 Checks each hostname (no bulk third-party import):
   Same announcing ASN as this VPS, TLS 1.3, ALPN h2, cert SAN, redirects.
+  Reject known CDN/WAF edge ranges, CDN DNS chains, and CDN HTTP headers.
 Rejects Apple/iCloud/Microsoft names and .cn/.ru/.ir TLDs per Xray-core.
 Discovers candidates from the VPS PTR suffixes plus curated and supplied hosts.
-Unknown or mixed ASNs are rejected; there is no unchecked fallback.
+Unknown/mixed ASNs and failed CDN checks are rejected; no unchecked fallback.
+Passing screening is not proof of a non-CDN origin or a bandwidth cap.
 
 Usage:
   kokoro-xray reality scan
@@ -315,6 +327,7 @@ EOF
     kokoro_need_cmd curl
     kokoro_need_cmd getent
     kokoro_need_cmd jq
+    kokoro_need_cmd grepcidr
 
     [[ "$limit" =~ ^[1-9][0-9]*$ ]] || kokoro_die "invalid --limit: ${limit}"
     [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || kokoro_die "invalid --jobs: ${jobs}"
@@ -330,7 +343,7 @@ EOF
         unset KOKORO_REALITY_ASN_CACHE
         return 1
     fi
-    kokoro_log "REALITY network: ${KOKORO_REALITY_SERVER_IP}, ASN ${KOKORO_REALITY_SERVER_ASNS}; same-ASN targets only"
+    kokoro_log "REALITY network: ${KOKORO_REALITY_SERVER_IP}, ASN ${KOKORO_REALITY_SERVER_ASNS}; same-ASN, CDN-screened targets only"
     kokoro_reality_collect_hosts "${collect_args[@]}" | sort -u | grep -v '^$' >"$tmp_hosts"
 
     local count
@@ -364,7 +377,7 @@ EOF
         echo -e "${YELLOW}sample failures:${NC}"
         grep '^FAIL' "$tmp_out" | head -10 \
             | awk -F'\t' '{printf "  %-32s %s\n", $5, $4}'
-        kokoro_warn "no verified same-ASN target; supply provider-hosted domains with --domains or --file, or use TLS"
+        kokoro_warn "no verified same-ASN target passed CDN screening; supply direct provider-hosted domains with --domains or --file, or use TLS"
         rm -rf "$tmp_hosts" "$tmp_out" "$KOKORO_REALITY_ASN_CACHE"
         unset KOKORO_REALITY_ASN_CACHE
         return 1

@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install jq
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap jq grepcidr
       - name: Run render tests
         run: bash .github/scripts/render-test.sh
       - name: Run download verification tests
@@ -25,6 +25,7 @@ jobs:
         run: |
           bash .github/scripts/reality-scan-test.sh
           bash tests/reality-asn.sh
+          bash tests/reality-cdn.sh
       - name: Run network-tune tests
         run: bash .github/scripts/network-tune-test.sh
       - name: Run link tests

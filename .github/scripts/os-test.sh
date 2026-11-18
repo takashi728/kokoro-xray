@@ -9,12 +9,12 @@ source "${ROOT}/lib/os.sh"
 kokoro_os_supported() { return 0; }
 dpkg-query() {
     case "${!#}" in
-        jq | uuid-runtime) return 1 ;;
+        jq | uuid-runtime | grepcidr) return 1 ;;
         *) printf 'install ok installed\n' ;;
     esac
 }
 kokoro_pkg_install() {
-    [[ "$*" == "jq uuid-runtime" ]]
+    [[ "$*" == "jq uuid-runtime grepcidr" ]]
 }
 
 kokoro_install_deps >/dev/null
@@ -39,7 +39,7 @@ bootstrap_line="$(line_exact 'install_bootstrap_deps' "${ROOT}/install.sh")"
 install_line="$(line_exact 'if [[ "$INSTALL_SOURCE" == "remote" ]]; then' "${ROOT}/install.sh")"
 [[ "$bootstrap_line" -lt "$install_line" ]]
 
-for package in jq openssl uuid-runtime wireguard-tools ufw; do
+for package in jq openssl uuid-runtime wireguard-tools ufw grepcidr; do
     grep -q "$package" "${ROOT}/install.sh"
     grep -q "$package" "${ROOT}/lib/os.sh"
 done

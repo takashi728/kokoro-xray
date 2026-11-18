@@ -67,6 +67,13 @@ REALITY destination. Manual onboarding uses the same checks. There is no
 cross-ASN fallback. Results sort by TLS latency, then compatibility score.
 This selection logic is independent of XHTTP versus a future RAW transport.
 
+Target eligibility also screens locally resolved IPs against a pinned CDN/WAF
+edge dataset using `grepcidr`. RIPEstat DNS chains must agree with those IPs
+and contain no known CDN suffix. HTTPS probes reject CDN-specific headers.
+Unknown lookup results or checker errors fail closed, including manual setup.
+The generic cloud ranges in the upstream dataset are deliberately not used.
+Passing these checks is not proof of a dedicated origin or a bandwidth bound.
+
 ## Multi-node pairing
 
 1. Install **exit** → copy `exit_wg_pubkey`

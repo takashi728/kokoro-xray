@@ -17,6 +17,13 @@ curl() {
     if [[ -z "$resource" && "$*" == *https://match.example/* ]]; then
         printf 'HTTP/2 200\r\n\r\n'; return 0
     fi
+    if [[ "$*" == *dns-chain* ]]; then
+        case "$resource" in
+            ipv6.example) jq -cn --arg host "$resource" '{status:"ok",data:{forward_nodes:{($host):["2001:db8::20"]}}}' ;;
+            *) jq -cn --arg host "$resource" '{status:"ok",data:{forward_nodes:{($host):["203.0.113.20","2001:db8::20"]}}}' ;;
+        esac
+        return 0
+    fi
     case "$resource" in
         203.0.113.10|203.0.113.20|2001:db8::20)
             printf '{"status":"ok","data":{"asns":[64500]}}' ;;

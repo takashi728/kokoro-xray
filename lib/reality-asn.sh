@@ -2,6 +2,7 @@
 # REALITY target network checks, shared by scans and manual selection.
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
+source "${KOKORO_ROOT}/lib/reality-cdn.sh"
 
 kokoro_reality_ip_literal() {
     local ip="$1" octet count=0
@@ -97,6 +98,7 @@ kokoro_reality_target_ip() {
             selected="$ip"
         fi
     done <<<"$ips"
+    kokoro_reality_cdn_screen "$host" "$ips" || return 2
     printf '%s\n' "$selected"
 }
 

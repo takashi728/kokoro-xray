@@ -234,6 +234,34 @@ Same-ASN selection reduces one inconsistency; it is not proof against GFW
 detection or a guarantee that the SNI resolves identically inside China.
 RIPEstat sees the queried public IPs. No credentials are sent.
 
+CDN screening is independent of the ASN match. Targets are also rejected when
+any locally resolved address matches a known CDN/WAF edge range, a DNS-chain
+hostname matches a known CDN suffix, or the pinned HTTPS endpoint sends a known
+CDN header. Cloudflare, Fastly, CloudFront, Akamai aliases, and other providers
+are covered by the pinned ProjectDiscovery CDNCheck dataset in
+`data/reality-cdn.json`. Its source revision, source checksum, review date, and
+MIT license are recorded in the file. Only CDN/WAF ranges and CDN suffixes are
+included; general cloud VM ranges are excluded. Using Cloudflare for DNS alone
+does not cause rejection.
+
+The installer installs the small `grepcidr` distro package for IPv4/IPv6 CIDR
+matching. Existing installs need `apt install grepcidr` before scanning.
+DNS-chain lookups use RIPEstat over HTTPS. Failed lookups, inconsistent local
+and RIPEstat DNS answers, missing data, and checker errors reject the target.
+Manual and noninteractive onboarding use exactly the same screening.
+
+The output label is **cdn-screened**, not proof of a non-CDN origin. Providers
+can hide their edge service or add ranges after the dataset was reviewed.
+Choose a direct provider-hosted website; do not treat a clean result as a
+bandwidth guarantee. Even an ordinary origin can serve large unauthenticated
+REALITY fallback transfers. This change adds no fallback rate limits, which
+have their own fingerprinting tradeoffs.
+
+To refresh the dataset, review a new immutable CDNCheck source revision and
+regenerate `ranges` from the union of its `cdn` and `waf` sections and `suffixes`
+from its `common` section. Preserve the upstream license, record the new source
+SHA-256 and review date, and run `tests/reality-cdn.sh` before committing.
+
 The selection checks apply to REALITY independently of its transport. This
 project currently emits XHTTP REALITY with an empty VLESS flow. A future RAW
 profile can reuse selection, but must use the actual Vision flow names:

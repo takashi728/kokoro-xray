@@ -42,7 +42,7 @@ kokoro_install_deps() {
     local package
     local -a packages=(
         ca-certificates curl git jq openssl tar unzip
-        uuid-runtime wireguard-tools ufw libc-bin procps
+        uuid-runtime wireguard-tools ufw libc-bin procps grepcidr
     )
     local -a missing=()
 

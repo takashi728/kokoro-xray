@@ -62,7 +62,7 @@ if [[ "${KOKORO_LIVE_SCAN:-}" == "1" ]]; then
     kokoro_reality_network_init
     out="$(kokoro_reality_validate_one github.com)"
     # A foreign ASN is an expected rejection, not an outage in the TLS scanner.
-    [[ "$out" == OK$'\t'* || "$out" == *$'\tasn-mismatch-or-unknown\t'* ]] || {
+    [[ "$out" == OK$'\t'* || "$out" == *$'\tasn-mismatch-or-unknown\t'* || "$out" == *$'\tcdn-or-unverified\t'* || "$out" == *$'\tcdn-header\t'* ]] || {
         echo "live fail: $out"; exit 1;
     }
     echo "live ASN policy OK"

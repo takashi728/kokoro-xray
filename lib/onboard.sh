@@ -12,14 +12,14 @@ kokoro_onboard_reality_target() {
             kokoro_log "REALITY target set from scan"
             return 0
         fi
-        kokoro_warn "scan found no verified same-ASN target"
+        kokoro_warn "scan found no verified same-ASN target passing CDN screening"
     fi
-    while read -r -p "Provider-hosted REALITY domain (ownership not required; empty cancels): " sni; do
+    while read -r -p "Direct, non-CDN provider-hosted REALITY domain (empty cancels): " sni; do
         [[ -n "$sni" ]] || return 1
         if kokoro_reality_apply_host "$sni"; then
             return 0
         fi
-        kokoro_warn "choose another domain hosted in this VPS's ASN"
+        kokoro_warn "choose a direct domain in this VPS's ASN; CDN targets and failed checks are rejected"
     done
     return 1
 }
