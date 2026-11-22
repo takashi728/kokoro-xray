@@ -25,6 +25,7 @@ kokoro_exit_install() {
     kokoro_install_deps
     kokoro_ensure_state
     kokoro_cfg_set_str '.role' 'exit'
+    kokoro_onboard_outbound_proxy || exit 1
     kokoro_onboard_firewall
 
     kokoro_xray_install

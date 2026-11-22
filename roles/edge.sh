@@ -32,7 +32,7 @@ kokoro_edge_install() {
     kokoro_ensure_state
     kokoro_cfg_set_str '.role' 'edge'
 
-    kokoro_onboard_edge
+    kokoro_onboard_edge || exit 1
     kokoro_xray_install
 
     if [[ "$FORCE_SECRETS" == "true" ]]; then

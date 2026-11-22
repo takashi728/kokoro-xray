@@ -69,6 +69,34 @@ jq -e '.outbounds | map(.tag) | index("TOR")' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[0].outboundTag == "TOR"' "${OUT}/exit-xray.json" >/dev/null
 jq -e '.routing.rules[-1].outboundTag == "DIRECT"' "${OUT}/exit-xray.json" >/dev/null
 
+echo "== authenticated outbound proxy =="
+for protocol in socks http; do
+    for role in edge exit; do
+        jq --arg protocol "$protocol" '
+            .outbound_proxy = {protocol: $protocol, address: "proxy.example.com", port: 1080,
+                domains: ["google.com"], user: "test-user", pass: "test-password"}
+        ' "${FIX}/${role}-secrets.json" >"${OUT}/proxy-secrets.json"
+        jq -n -f "${ROOT}/lib/render.jq" --slurpfile cfg "${FIX}/${role}-config.json" \
+            --slurpfile sec "${OUT}/proxy-secrets.json" >"${OUT}/proxy-${role}.json"
+        jq -e --arg protocol "$protocol" '
+            .outbounds[-1] == {tag: "CUSTOM_PROXY", protocol: $protocol,
+                settings: {address: "proxy.example.com", port: 1080, user: "test-user", pass: "test-password"}}
+            and ([.routing.rules[] | select(.domain == ["domain:google.com"]) | [.network, .outboundTag]]
+                == [["tcp", "CUSTOM_PROXY"], ["udp", "BLOCK"]])
+            and (.routing.rules[-1].outboundTag == (if .inbounds[0].protocol == "wireguard" then "DIRECT" else "WG_TO_EXIT" end))
+        ' "${OUT}/proxy-${role}.json" >/dev/null
+        if command -v xray >/dev/null 2>&1; then
+            xray run -test -config "${OUT}/proxy-${role}.json"
+        fi
+    done
+done
+jq '.outbound_proxy.pass = ""' "${OUT}/proxy-secrets.json" >"${OUT}/proxy-invalid.json"
+if jq -n -f "${ROOT}/lib/render.jq" --slurpfile cfg "${FIX}/exit-config.json" \
+    --slurpfile sec "${OUT}/proxy-invalid.json" >/dev/null 2>&1; then
+    echo "renderer accepted an empty proxy password" >&2
+    exit 1
+fi
+
 if command -v xray >/dev/null 2>&1; then
     echo "== xray -test =="
     xray run -test -config "${OUT}/edge-xray.json"

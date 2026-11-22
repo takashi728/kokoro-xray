@@ -96,7 +96,60 @@ kokoro_onboard_edge() {
     fi
 
     kokoro_cfg_set '.tor.enabled' 'false'
+    kokoro_onboard_outbound_proxy || return 1
     kokoro_onboard_firewall
+}
+
+kokoro_onboard_outbound_proxy() {
+    [[ -t 0 ]] || return 0
+    local choice protocol address port domains user pass proxy tmp
+    if [[ "$(kokoro_sec '.outbound_proxy != null')" == true ]]; then
+        read -r -p "Custom outbound proxy [keep/edit/remove] (keep): " choice || return 1
+        case "${choice,,}" in
+            ""|keep) return 0 ;;
+            edit) ;;
+            remove) kokoro_sec_set '.outbound_proxy' 'null'; return $? ;;
+            *) kokoro_die "choose keep, edit, or remove" ;;
+        esac
+    else
+        read -r -p "Use a custom authenticated outbound proxy? [y/N]: " choice || return 1
+        [[ "${choice,,}" == y || "${choice,,}" == yes ]] || return 0
+    fi
+
+    read -r -p "Proxy type [socks5/http]: " protocol || return 1
+    case "${protocol,,}" in
+        socks5) protocol=socks ;;
+        http) protocol=http ;;
+        *) kokoro_die "proxy type must be socks5 or http" ;;
+    esac
+    read -r -p "Proxy hostname or IP (no scheme or port): " address || return 1
+    read -r -p "Proxy port: " port || return 1
+    [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) ||
+        kokoro_die "proxy port must be 1-65535"
+    read -r -p "Destination domains (comma-separated, includes subdomains): " domains || return 1
+    read -r -p "Proxy username: " user || return 1
+    read -rs -p "Proxy password (required): " pass || return 1
+    printf '\n' >&2
+
+    proxy="$(printf '%s\0' "$address" "$domains" "$user" "$pass" |
+        jq -Rse --arg protocol "$protocol" --argjson port "$((10#$port))" '
+            split("\u0000") as [$address, $domains, $user, $pass]
+            | ($domains | split(",") | map(gsub("^\\s+|\\s+$"; "") | ascii_downcase) | unique) as $domains_list
+            | select(($address | test("^([a-zA-Z0-9][a-zA-Z0-9.-]*|[a-fA-F0-9:]*:[a-fA-F0-9:.]*:[a-fA-F0-9:.]*)$"))
+                and ($domains_list | length > 0 and all(test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")))
+                and ($user | length > 0 and (contains(":") | not))
+                and ($pass | length > 0)
+                and ($protocol != "socks" or (($user | utf8bytelength) <= 255 and ($pass | utf8bytelength) <= 255)))
+            | {protocol: $protocol, address: $address, port: $port, domains: $domains_list, user: $user, pass: $pass}
+        ')" || kokoro_die "invalid proxy address, destination domains, or credentials"
+
+    tmp="$(mktemp "${KOKORO_SECRETS}.XXXXXX")" || return 1
+    if ! jq --slurpfile proxy /dev/stdin '.outbound_proxy = $proxy[0]' "${KOKORO_SECRETS}" >"$tmp" <<<"$proxy" ||
+        ! mv -- "$tmp" "${KOKORO_SECRETS}"; then
+        rm -f -- "$tmp"
+        kokoro_die "could not save outbound proxy settings"
+    fi
+    kokoro_state_refresh_sec
 }
 
 kokoro_onboard_firewall() {

@@ -197,6 +197,24 @@ parallel with the selected VLESS mode and defaults to:
 Caddy disables its own HTTP/3 listener while Hysteria2 is enabled so Xray alone
 owns UDP `443`. Hysteria Realm/NAT-to-NAT mode is intentionally not configured.
 
+## Custom Outbound Proxy
+
+Interactive edge and exit setup offer an optional SOCKS5 or HTTP CONNECT
+proxy. Enter its host, port, username, password, and comma-separated
+destination domains. Each domain also matches its subdomains. Run setup again
+to keep, edit, or remove the proxy.
+
+Matching TCP uses the custom proxy ahead of the node's normal routes. Matching
+UDP is blocked, so QUIC may need to fall back to TCP. Unmatched traffic keeps
+its normal route. On a paired setup, configure the proxy on the exit to keep
+the WireGuard hop. Configuring it on the edge sends matching traffic from
+the edge itself. IP-only traffic without a sniffable hostname cannot match
+a domain rule.
+
+Credentials are stored in server secrets and excluded from client exports.
+Use a proxy that requires authentication on a trusted or encrypted link.
+Plain SOCKS5 and HTTP CONNECT do not encrypt the credentials on that link.
+
 ## REALITY Target Scan
 
 ```bash

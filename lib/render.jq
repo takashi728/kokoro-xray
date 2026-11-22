@@ -6,6 +6,7 @@ def sec: $sec[0];
 def mode: cfg.inbound.mode;
 def role: cfg.role;
 def hysteria_enabled: cfg.inbound.hysteria.enabled;
+def outbound_proxy: sec.outbound_proxy;
 def vless_decryption:
   if cfg.inbound.vless_encryption.enabled
   then sec.inbound.vless_encryption.decryption
@@ -130,6 +131,31 @@ def base_outbounds: [
   { tag: "BLOCK", protocol: "blackhole" }
 ];
 
+def custom_proxy_outbounds:
+  if outbound_proxy == null then []
+  else outbound_proxy as $p
+    | if (["socks", "http"] | index($p.protocol)) == null
+         or ($p.address | type != "string" or length == 0)
+         or ($p.port | type != "number" or . < 1 or . > 65535 or floor != .)
+         or ($p.user | type != "string" or length == 0)
+         or ($p.pass | type != "string" or length == 0)
+         or ($p.domains | type != "array" or length == 0 or any(type != "string" or length == 0))
+      then error("invalid custom outbound proxy settings")
+      else [{
+        tag: "CUSTOM_PROXY", protocol: $p.protocol,
+        settings: ($p | {address, port, user, pass})
+      }] end
+  end;
+
+def custom_proxy_rules:
+  if outbound_proxy == null then []
+  else (outbound_proxy.domains | map("domain:" + .)) as $domains
+    | [
+      {type: "field", domain: $domains, network: "tcp", outboundTag: "CUSTOM_PROXY"},
+      {type: "field", domain: $domains, network: "udp", outboundTag: "BLOCK"}
+    ]
+  end;
+
 def exit_tor_outbound: if cfg.tor.enabled then
   [{ tag: "TOR", protocol: "socks", settings: { servers: [{ address: "127.0.0.1", port: cfg.tor.socks_port }] } }]
 else [] end;
@@ -195,16 +221,16 @@ else [] end;
 
 def edge_single_routing: {
   domainStrategy: "IPIfNonMatch",
-  rules: (google_direct_rules + single_node_block_rules + [
+  rules: (custom_proxy_rules + google_direct_rules + single_node_block_rules + [
     { type: "field", network: "tcp,udp", outboundTag: "DIRECT" }
   ])
 };
 
 def edge_multinode_routing: {
   domainStrategy: "IPIfNonMatch",
-  rules: [
+  rules: (custom_proxy_rules + [
     { type: "field", network: "tcp,udp", outboundTag: "WG_TO_EXIT" }
-  ]
+  ])
 };
 
 def edge_routing: if cfg.multinode.enabled then edge_multinode_routing else edge_single_routing end;
@@ -216,7 +242,7 @@ def edge_inbounds:
 
 def edge_config: log_block + {
   inbounds: edge_inbounds,
-  outbounds: (base_outbounds + wg_outbound),
+  outbounds: (base_outbounds + wg_outbound + custom_proxy_outbounds),
   routing: edge_routing,
   policy: policy_block.policy
 };
@@ -239,11 +265,13 @@ def exit_inbound: {
 else {} end;
 
 def exit_config: log_block + {
-  inbounds: [exit_inbound],
-  outbounds: (base_outbounds + exit_tor_outbound),
+  inbounds: [exit_inbound + (if outbound_proxy == null then {} else {
+    sniffing: {enabled: true, destOverride: ["http", "tls", "quic"], routeOnly: true}
+  } end)],
+  outbounds: (base_outbounds + exit_tor_outbound + custom_proxy_outbounds),
   routing: {
     domainStrategy: "IPIfNonMatch",
-    rules: (exit_tor_rules + [
+    rules: (exit_tor_rules + custom_proxy_rules + [
       { type: "field", ip: ["geoip:private"], outboundTag: "BLOCK" },
       { type: "field", network: "tcp,udp", outboundTag: "DIRECT" }
     ])

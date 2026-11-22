@@ -4,16 +4,18 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_render_xray() {
-    local out
+    local out tmp
     kokoro_validate_service_paths
     out="$(kokoro_cfg '.paths.xray_config')"
     install -d "$(dirname "$out")"
-    jq -n -f "${KOKORO_ROOT}/lib/render.jq" \
+    tmp="$(mktemp "${out}.XXXXXX")" || return 1
+    if ! jq -n -f "${KOKORO_ROOT}/lib/render.jq" \
         --slurpfile cfg "${KOKORO_CONFIG}" \
         --slurpfile sec "${KOKORO_SECRETS}" \
-        >"${out}.tmp"
-    mv "${out}.tmp" "$out"
-    chmod 600 "$out"
+        >"$tmp" || ! mv -- "$tmp" "$out"; then
+        rm -f -- "$tmp"
+        return 1
+    fi
 }
 
 kokoro_render_caddy() {
@@ -34,7 +36,7 @@ kokoro_render() {
     role="$(kokoro_cfg '.role')"
     case "$role" in
         edge)
-            kokoro_render_xray
+            kokoro_render_xray || return 1
             kokoro_render_caddy
             ;;
         exit)
