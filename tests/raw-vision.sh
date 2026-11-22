@@ -85,8 +85,10 @@ grep -qx 'discussion = false' "$ROOT/templates/privatebin/conf.php"
 grep -qx 'fileupload = false' "$ROOT/templates/privatebin/conf.php"
 
 # RAW and HY2 coexist, including a shared direct TLS domain.
+kokoro_cfg_set_str '.inbound.mode' tls
 kokoro_sec_set_str '.inbound.hysteria.auth' test-auth
 kokoro_sec_set_str '.inbound.hysteria.obfs_password' test-obfs
+kokoro_sec_set '.outbound_proxy' '{"protocol":"socks","address":"proxy.example","port":1080,"domains":["example.com"],"user":"test-user","pass":"test-password"}'
 kokoro_cfg_set '.inbound.hysteria.enabled' true
 kokoro_cfg_set_str '.paths.hysteria_cert' "$TMP/tls.crt"
 kokoro_cfg_set_str '.paths.hysteria_key' "$TMP/tls.key"
@@ -99,8 +101,16 @@ for domain in direct.example hy.example; do
 done
 jq -n -f "$ROOT/lib/render.jq" --slurpfile cfg "$KOKORO_CONFIG" \
     --slurpfile sec "$KOKORO_SECRETS" >"$TMP/raw-hy.json"
+jq -e '
+    [.inbounds[].tag] == ["TLS_RAW_IN", "HYSTERIA2_IN"]
+    and (.inbounds[0].settings.clients[0].flow == "xtls-rprx-vision")
+    and (.inbounds[1].port == 443)
+    and (.outbounds[-1].tag == "CUSTOM_PROXY")
+    and (.routing.rules[0].outboundTag == "CUSTOM_PROXY")
+' "$TMP/raw-hy.json" >/dev/null
 if command -v xray >/dev/null 2>&1; then xray run -test -config "$TMP/raw-hy.json"; fi
 kokoro_cfg_set '.inbound.hysteria.enabled' false
+kokoro_cfg_set_str '.inbound.mode' both
 
 # Old state stays XHTTP when defaults are merged; RAW is an explicit selection.
 kokoro_cfg_set '.inbound.transport' '"xhttp"'

@@ -29,11 +29,11 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 The reviewed installer commit is
-`b93c64b93550293e614086eaacca0f6bfeff651a`. Download the bootstrap from that
+`c8141cd1a366cf4e2dc7a6dc3503918e6fb465f1`. Download the bootstrap from that
 immutable revision and pass the same SHA to it:
 
 ```bash
-commit=b93c64b93550293e614086eaacca0f6bfeff651a
+commit=c8141cd1a366cf4e2dc7a6dc3503918e6fb465f1
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
@@ -144,6 +144,12 @@ Certificate files remain root-owned inside Caddy's certificate directory, and
 a systemd watcher restarts Xray after renewal. Certificate bootstrapping
 restores the previous Caddy configuration before the regular apply transaction.
 
+To run RAW TLS Vision and Hysteria2 on one VPS, select `raw` and `tls`
+during edge setup, then answer yes at the Hysteria2 prompt. Provide DNS-only
+hostnames for both services. Allow TCP 80 and 443 and the configured HY2 UDP
+ports through the provider firewall. Use `kokoro-xray link --json tls` for
+Vision and `kokoro-xray link --json hysteria` for HY2.
+
 RAW TLS browser traffic follows this path:
 
 ```text
@@ -169,10 +175,7 @@ the borrowed-certificate behavior. A common web app can also be fingerprinted;
 it is not proof that a proxy is undetectable.
 
 Use `kokoro-xray link --json reality` or `--json tls` as before. Switching a
-transport requires refreshing client profiles. The immutable installer pin
-in the Install section is the last reviewed baseline and predates this
-development feature; install a reviewed commit containing RAW support when
-testing it.
+transport requires refreshing client profiles.
 
 OpenWrt TPROXY client deployment is a separate next step. This installer still
 targets Debian/Ubuntu systemd hosts and does not configure router firewall rules.
