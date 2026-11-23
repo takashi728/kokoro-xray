@@ -11,6 +11,7 @@
   "menu_validate": "Validate configs",
   "menu_reality_scan": "Scan REALITY targets",
   "menu_tune": "Tune network (TFO + BBR)",
+  "menu_outbound_proxy": "Configure outbound proxy",
   "menu_quit": "Quit",
   "menu_choice": "Choice",
   "invalid_choice": "invalid choice"

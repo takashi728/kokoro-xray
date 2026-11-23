@@ -223,6 +223,7 @@ settings. Set `KOKORO_PUBLIC_ADDRESS` to override public-address detection.
 | `edge [--keep-secrets]` | Install or update edge node |
 | `exit [--keep-secrets]` | Install or update exit node |
 | `apply` | Render, validate, and reload services |
+| `outbound-proxy` | Add, edit, or remove an outbound proxy without repeating setup |
 | `pair` | Exchange edge/exit WireGuard peer info |
 | `link [--json tls\|reality\|hysteria]` | Print client links or an Xray JSON profile |
 | `status` | Show service and config status |
@@ -276,8 +277,13 @@ owns UDP `443`. Hysteria Realm/NAT-to-NAT mode is intentionally not configured.
 
 Interactive edge and exit setup offer an optional SOCKS5 or HTTP CONNECT
 proxy. Enter its host, port, username, password, and comma-separated
-destination domains. Each domain also matches its subdomains. Run setup again
-to keep, edit, or remove the proxy.
+destination domains. Each domain also matches its subdomains.
+
+On an existing node, choose **12) Configure outbound proxy** or run
+`sudo kokoro-xray outbound-proxy`. Press Enter on any field to keep its saved
+value when editing. The password stays hidden. Run `sudo kokoro-xray apply`
+(menu option 4) to activate the saved changes and reload services. There is no
+need to re-enter transport, domain, or certificate settings.
 
 Matching TCP uses the custom proxy ahead of the node's normal routes. Matching
 UDP is blocked, so QUIC may need to fall back to TCP. Unmatched traffic keeps

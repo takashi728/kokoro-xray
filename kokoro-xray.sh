@@ -24,6 +24,7 @@ menu() {
     echo "  9) $(kokoro_t menu_validate)"
     echo " 10) $(kokoro_t menu_reality_scan)"
     echo " 11) $(kokoro_t menu_tune)"
+    echo " 12) $(kokoro_t menu_outbound_proxy)"
     echo "  q) $(kokoro_t menu_quit)"
     echo ""
 }
@@ -41,6 +42,10 @@ kokoro_dispatch() {
             kokoro_firewall_cli "$@"
             ;;
         apply)   source "${KOKORO_ROOT}/lib/apply.sh"; kokoro_apply ;;
+        outbound-proxy)
+            source "${KOKORO_ROOT}/lib/onboard.sh"
+            kokoro_manage_outbound_proxy "$@" || exit $?
+            ;;
         pair)    bash "${KOKORO_ROOT}/roles/pair.sh" ;;
         status)  source "${KOKORO_ROOT}/lib/health.sh"; kokoro_health ;;
         validate) bash "${KOKORO_ROOT}/lib/validate.sh" ;;
@@ -127,6 +132,7 @@ while true; do
         9) bash "${KOKORO_ROOT}/lib/validate.sh" ;;
         10) bash "${KOKORO_ROOT}/roles/reality-scan.sh" --limit 10 ;;
         11) source "${KOKORO_ROOT}/lib/network-tune.sh"; kokoro_need_root; kokoro_network_tune ;;
+        12) bash "$SCRIPT_PATH" outbound-proxy || true ;;
         q|Q) exit 0 ;;
         *) kokoro_warn "$(kokoro_t invalid_choice)" ;;
     esac

@@ -138,34 +138,48 @@ kokoro_onboard_edge() {
 
 kokoro_onboard_outbound_proxy() {
     [[ -t 0 ]] || return 0
-    local choice protocol address port domains user pass proxy tmp
+    local choice protocol address port domains user pass proxy
+    local old_protocol="" old_address="" old_port="" old_domains="" old_user="" password_hint=required
     if [[ "$(kokoro_sec '.outbound_proxy != null')" == true ]]; then
         read -r -p "Custom outbound proxy [keep/edit/remove] (keep): " choice || return 1
         case "${choice,,}" in
             ""|keep) return 0 ;;
             edit) ;;
-            remove) kokoro_sec_set '.outbound_proxy' 'null'; return $? ;;
+            remove) kokoro_save_outbound_proxy null; return $? ;;
             *) kokoro_die "choose keep, edit, or remove" ;;
         esac
+        old_protocol="$(kokoro_sec '.outbound_proxy.protocol // ""')"
+        [[ "$old_protocol" != socks ]] || old_protocol=socks5
+        old_address="$(kokoro_sec '.outbound_proxy.address // ""')"
+        old_port="$(kokoro_sec '.outbound_proxy.port // ""')"
+        old_domains="$(kokoro_sec '.outbound_proxy.domains // [] | join(",")')"
+        old_user="$(kokoro_sec '.outbound_proxy.user // ""')"
+        password_hint='Enter to keep current'
     else
         read -r -p "Use a custom authenticated outbound proxy? [y/N]: " choice || return 1
         [[ "${choice,,}" == y || "${choice,,}" == yes ]] || return 0
     fi
 
-    read -r -p "Proxy type [socks5/http]: " protocol || return 1
+    read -r -p "Proxy type [socks5/http]${old_protocol:+ ($old_protocol)}: " protocol || return 1
+    protocol="${protocol:-$old_protocol}"
     case "${protocol,,}" in
         socks5) protocol=socks ;;
         http) protocol=http ;;
         *) kokoro_die "proxy type must be socks5 or http" ;;
     esac
-    read -r -p "Proxy hostname or IP (no scheme or port): " address || return 1
-    read -r -p "Proxy port: " port || return 1
+    read -r -p "Proxy hostname or IP (no scheme or port)${old_address:+ [$old_address]}: " address || return 1
+    address="${address:-$old_address}"
+    read -r -p "Proxy port${old_port:+ [$old_port]}: " port || return 1
+    port="${port:-$old_port}"
     [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) ||
         kokoro_die "proxy port must be 1-65535"
-    read -r -p "Destination domains (comma-separated, includes subdomains): " domains || return 1
-    read -r -p "Proxy username: " user || return 1
-    read -rs -p "Proxy password (required): " pass || return 1
+    read -r -p "Destination domains (comma-separated, includes subdomains)${old_domains:+ [$old_domains]}: " domains || return 1
+    domains="${domains:-$old_domains}"
+    read -r -p "Proxy username${old_user:+ [$old_user]}: " user || return 1
+    user="${user:-$old_user}"
+    IFS= read -rs -p "Proxy password ($password_hint): " pass || return 1
     printf '\n' >&2
+    [[ -n "$pass" || -z "$old_protocol" ]] || pass="$(kokoro_sec '.outbound_proxy.pass // ""')"
 
     proxy="$(printf '%s\0' "$address" "$domains" "$user" "$pass" |
         jq -Rse --arg protocol "$protocol" --argjson port "$((10#$port))" '
@@ -179,6 +193,11 @@ kokoro_onboard_outbound_proxy() {
             | {protocol: $protocol, address: $address, port: $port, domains: $domains_list, user: $user, pass: $pass}
         ')" || kokoro_die "invalid proxy address, destination domains, or credentials"
 
+    kokoro_save_outbound_proxy "$proxy"
+}
+
+kokoro_save_outbound_proxy() {
+    local proxy="$1" tmp
     tmp="$(mktemp "${KOKORO_SECRETS}.XXXXXX")" || return 1
     if ! jq --slurpfile proxy /dev/stdin '.outbound_proxy = $proxy[0]' "${KOKORO_SECRETS}" >"$tmp" <<<"$proxy" ||
         ! mv -- "$tmp" "${KOKORO_SECRETS}"; then
@@ -186,6 +205,24 @@ kokoro_onboard_outbound_proxy() {
         kokoro_die "could not save outbound proxy settings"
     fi
     kokoro_state_refresh_sec
+}
+
+kokoro_manage_outbound_proxy() {
+    local previous
+    [[ "$#" -eq 0 ]] || kokoro_die "usage: kokoro-xray outbound-proxy"
+    kokoro_need_root
+    case "$(kokoro_cfg '.role')" in
+        edge|exit) ;;
+        *) kokoro_die "set up an edge or exit node first" ;;
+    esac
+    [[ -t 0 ]] || kokoro_die "outbound-proxy requires an interactive terminal"
+    previous="$(kokoro_sec '.outbound_proxy')" || return 1
+    kokoro_onboard_outbound_proxy || return 1
+    if [[ "$(kokoro_sec '.outbound_proxy')" == "$previous" ]]; then
+        kokoro_log "outbound proxy unchanged"
+    else
+        kokoro_log "outbound proxy saved. To activate: sudo kokoro-xray apply (menu option 4)"
+    fi
 }
 
 kokoro_onboard_firewall() {

@@ -17,6 +17,7 @@ jobs:
         run: |
           bash .github/scripts/render-test.sh
           bash tests/render-failure.sh
+          bash tests/outbound-proxy.sh
       - name: Run download verification tests
         run: bash .github/scripts/download-verify-test.sh
       - name: Run Caddy Go tests

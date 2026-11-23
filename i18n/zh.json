@@ -11,6 +11,7 @@
   "menu_validate": "验证配置",
   "menu_reality_scan": "扫描 REALITY 目标",
   "menu_tune": "网络调优 (TFO + BBR)",
+  "menu_outbound_proxy": "配置出站代理",
   "menu_quit": "退出",
   "menu_choice": "请选择",
   "invalid_choice": "无效选项"
