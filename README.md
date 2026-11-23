@@ -204,7 +204,14 @@ kokoro-xray link --json tls
 ```
 
 Use JSON export for TLS mode when the client app does not preserve advanced
-XHTTP settings from URL subscriptions. Use a current Xray client.
+XHTTP settings from URL subscriptions. With Xray-core `v26.11.9`, the TLS
+XHTTP JSON export generates Base62 session IDs instead of hyphenated UUIDs.
+This setting is client-side and does not change the VLESS user UUID.
+
+Cloudflare's default cache behavior respects the XHTTP download response's
+`Cache-Control: no-store`. If a zone rule overrides origin cache headers, set
+**Bypass cache** for the XHTTP hostname or path and make sure it takes
+precedence over that rule.
 
 VLESS REALITY JSON export for the selected transport:
 

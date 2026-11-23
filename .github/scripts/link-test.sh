@@ -81,7 +81,10 @@ printf '%s\n' "$tls_json" | jq -e '.routing.rules | map(select(.ip[]? == "geoip:
 printf '%s\n' "$tls_json" | jq -e '.routing.rules[-1].outboundTag == "kokoro-tls"' >/dev/null
 
 cli_tls_json="$(kokoro_link_show --json tls)"
-printf '%s\n' "$cli_tls_json" | jq -e '.outbounds[0].tag == "kokoro-tls"' >/dev/null
+printf '%s\n' "$cli_tls_json" | jq -e '
+    .outbounds[0] | .tag == "kokoro-tls" and
+    (.streamSettings.xhttpSettings | .sessionIDTable == "Base62" and .sessionIDLength == "22-26")
+' >/dev/null
 
 if command -v xray >/dev/null 2>&1; then
     printf '%s\n' "$cli_tls_json" >"${HOME}/.kokoro-xray/client-tls.json"

@@ -211,6 +211,8 @@ kokoro_link_vless_json() {
               xhttp_base_settings + {
                 host: $server_name,
                 mode: "auto",
+                sessionIDTable: "Base62",
+                sessionIDLength: "22-26",
                 xPaddingKey: "v",
                 xPaddingBytes: "16-96",
                 xPaddingHeader: "Referer",
