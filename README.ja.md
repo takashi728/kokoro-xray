@@ -28,11 +28,11 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 ## インストール
 
 レビュー済みのインストーラーコミットは
-`c8141cd1a366cf4e2dc7a6dc3503918e6fb465f1` にゃ。この不変リビジョンから
+`58cf7d18f34e94fda399c1879dc5382feb78edf9` にゃ。この不変リビジョンから
 ブートストラップを取得し、同じ SHA をブートストラップに渡すにゃ:
 
 ```bash
-commit=c8141cd1a366cf4e2dc7a6dc3503918e6fb465f1
+commit=58cf7d18f34e94fda399c1879dc5382feb78edf9
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
