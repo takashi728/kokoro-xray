@@ -34,6 +34,7 @@ kokoro_edge_install() {
     kokoro_cfg_set_str '.role' 'edge'
 
     kokoro_onboard_edge || exit 1
+    kokoro_small_vps_swap || exit 1
     kokoro_fallback_install
     kokoro_xray_install
 
@@ -56,7 +57,7 @@ kokoro_edge_install() {
 
     mode="$(kokoro_cfg '.inbound.mode')"
     if kokoro_caddy_required; then
-        kokoro_caddy_install
+        kokoro_caddy_install || exit 1
         if [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == xhttp && ( "$mode" == tls || "$mode" == both ) ]]; then
             kokoro_cf_dns01_hint
         fi

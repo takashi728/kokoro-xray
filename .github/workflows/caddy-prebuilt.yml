@@ -1,0 +1,48 @@
+name: Prebuilt Caddy L4
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/caddy-prebuilt.yml]
+
+permissions:
+  contents: write
+
+concurrency: caddy-prebuilt
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CADDY_VERSION: v2.11.9
+      CADDY_L4_VERSION: v0.1.3
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.11'
+          cache: false
+      - name: Build and publish Linux binaries
+        shell: bash
+        run: |
+          release="caddy-l4-${CADDY_VERSION}-${CADDY_L4_VERSION}"
+          if gh release view "$release" >/dev/null 2>&1; then
+            exit 0
+          fi
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.7
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" "$(go env GOPATH)/bin/xcaddy" build "$CADDY_VERSION" \
+              --with "github.com/mholt/caddy-l4@$CADDY_L4_VERSION" --output "$PWD/dist/caddy"
+            if [[ "$arch" == amd64 ]]; then
+              test "$(dist/caddy version | awk '{print $1}')" = "$CADDY_VERSION"
+              dist/caddy list-modules | grep -Fx layer4
+            fi
+            tar -C dist -czf "dist/caddy-linux-$arch.tar.gz" caddy
+            rm dist/caddy
+          done
+          gh release create "$release" dist/caddy-linux-{amd64,arm64}.tar.gz \
+            --target "$GITHUB_SHA" --latest=false --title "Caddy $CADDY_VERSION with caddy-l4 $CADDY_L4_VERSION" \
+            --notes "Linux Caddy binaries built with the pinned caddy-l4 plugin."

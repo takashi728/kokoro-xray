@@ -343,7 +343,15 @@ Both RAW Vision REALITY and XHTTP REALITY use these target selection checks.
 
 - Xray downloads are verified against repository-pinned SHA-256 hashes.
 - Xray-core is pinned to the latest tested stable release.
-- Caddy builds are pinned and rebuilt only when needed.
+- On VPSes with at most 2 CPUs and 4 GiB RAM, edge and exit setup keep existing
+  swap or zram and add persistent disk swap as needed to reach RAM size.
+  Set up zram beforehand to avoid allocating a disk swap file.
+- Small VPSes use prebuilt Caddy binaries. Stock Caddy comes from the official
+  release. The project builds the pinned caddy-l4 variant on GitHub Actions.
+  See the [prebuilt workflow](.github/workflows/caddy-prebuilt.yml) when updating
+  either version.
+  If the required verified binary is unavailable, setup stops before a source
+  build. Larger VPSes retain the pinned source build path.
 - If distro Go is too old, Caddy builds use a managed Go toolchain under `/usr/local/kokoro-go`.
 - UFW defaults to deny incoming and allow outgoing when firewall support is enabled.
 - XHTTP client JSON exports explicitly use the [Xray-core v26.3.27 XMUX defaults](https://github.com/XTLS/Xray-core/blob/v26.3.27/infra/conf/transport_internet.go#L391-L401), including `maxConcurrency: 1`. Each XMUX connection client handles one active proxied session at a time. Throughput depends on the network and workload.

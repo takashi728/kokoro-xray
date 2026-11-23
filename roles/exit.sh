@@ -27,6 +27,7 @@ kokoro_exit_install() {
     kokoro_cfg_set_str '.role' 'exit'
     kokoro_onboard_outbound_proxy || exit 1
     kokoro_onboard_firewall
+    kokoro_small_vps_swap || exit 1
 
     kokoro_xray_install
 
