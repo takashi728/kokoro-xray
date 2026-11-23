@@ -29,11 +29,11 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 The reviewed installer commit is
-`88a1554367e01fd5361320af4c5065fdae2a1c83`. Download the bootstrap from that
+`44cdd9a81c762166441401a33cbca159ee1e5cea`. Download the bootstrap from that
 immutable revision and pass the same SHA to it:
 
 ```bash
-commit=88a1554367e01fd5361320af4c5065fdae2a1c83
+commit=44cdd9a81c762166441401a33cbca159ee1e5cea
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
@@ -56,8 +56,11 @@ sudo kokoro-xray exit
 
 ## Update
 
-Normal update keeps existing state. Download and run a newly reviewed
-immutable bootstrap shown in **Install**, then run:
+Run the pinned installer from **Install** to update. It keeps your settings
+and secrets, but replaces `/opt/kokoro-xray`. Back up any local patches first.
+
+For client JSON changes, just export again. To regenerate and reload server
+configs, run:
 
 ```bash
 sudo kokoro-xray apply
@@ -197,23 +200,28 @@ the full UDP hopping range:
 kokoro-xray link --json hysteria
 ```
 
-TLS JSON export for the selected transport:
+### TLS XHTTP with Cloudflare
+
+1. Start with a **DNS-only** record pointing to your VPS.
+2. Run `sudo kokoro-xray edge`. Choose `xhttp`, then `tls`. Enter the hostname
+   and check that HTTPS works before continuing.
+3. Turn on **Proxied** (orange cloud) and use **Full (strict)** SSL/TLS.
+
+Leave caching at its defaults. Add **Bypass cache** for this hostname or
+XHTTP path only if another rule forces caching. Make sure the bypass wins.
+
+Export the client JSON:
 
 ```bash
 kokoro-xray link --json tls
 ```
 
-Use JSON export for TLS mode when the client app does not preserve advanced
-XHTTP settings from URL subscriptions. With Xray-core `v26.11.9`, the TLS
-XHTTP JSON export generates Base62 session IDs instead of hyphenated UUIDs.
-This setting is client-side and does not change the VLESS user UUID.
+Import the full JSON with Xray-core `v26.11.9`. It uses Base62 session IDs
+for XHTTP. Your VLESS user UUID stays the same.
 
-Cloudflare's default cache behavior respects the XHTTP download response's
-`Cache-Control: no-store`. If a zone rule overrides origin cache headers, set
-**Bypass cache** for the XHTTP hostname or path and make sure it takes
-precedence over that rule.
+### REALITY client JSON
 
-VLESS REALITY JSON export for the selected transport:
+Export the REALITY profile for your selected transport:
 
 ```bash
 kokoro-xray link --json reality
