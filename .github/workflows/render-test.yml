@@ -64,6 +64,8 @@ jobs:
           XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
           bash tests/hysteria-hop.sh
       - name: Run RAW Vision tests
-        run: PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
+        run: |
+          bash tests/raw-tls-domain.sh
+          PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
       - name: Live REALITY probe (github.com)
         run: KOKORO_LIVE_SCAN=1 bash .github/scripts/reality-scan-test.sh
