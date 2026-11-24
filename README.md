@@ -29,11 +29,11 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 The reviewed installer commit is
-`4fb7bdc1b4dd354bd52eea498a5eab3bb7d631bc`. Download the bootstrap from that
+`a66e85ffeb35b05e863068ca038f3c03cd92c56d`. Download the bootstrap from that
 immutable revision and pass the same SHA to it:
 
 ```bash
-commit=4fb7bdc1b4dd354bd52eea498a5eab3bb7d631bc
+commit=a66e85ffeb35b05e863068ca038f3c03cd92c56d
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
