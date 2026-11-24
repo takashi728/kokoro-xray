@@ -403,7 +403,7 @@ kokoro_link_tls_json() {
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 1
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
-    cdn="$(kokoro_tls_domain)"
+    cdn="${3:-$(kokoro_tls_domain)}"
     encryption="$(kokoro_link_vless_encryption tls)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 1
 
@@ -435,18 +435,22 @@ kokoro_link_reality_json() {
 kokoro_link_xhttp_leg() {
     local spec="$1" kind="${1%%=*}" address=""
     case "$kind" in
-        reality|cdn-h2|cdn-h3) ;;
-        *) kokoro_die "unknown leg: $kind (use reality=IP, cdn-h2[=IP], or cdn-h3[=IP])" ;;
+        reality|direct-h2|cdn-h2|cdn-h3) ;;
+        *) kokoro_die "unknown leg: $kind (use reality=IP, direct-h2=IP, cdn-h2[=IP], or cdn-h3[=IP])" ;;
     esac
     [[ "$spec" != *=* ]] || address="${spec#*=}"
-    if [[ "$kind" == reality || "$spec" == *=* ]]; then
+    if [[ "$kind" == reality || "$kind" == direct-h2 || "$spec" == *=* ]]; then
         source "${KOKORO_ROOT}/lib/reality-asn.sh"
         kokoro_reality_ip_literal "$address" ||
             kokoro_die "use a literal IPv4 or unbracketed IPv6 address for $kind"
     fi
     case "$kind" in
         reality) kokoro_link_reality_json "$address" || kokoro_die "REALITY profile is unavailable" ;;
-        cdn-h2|cdn-h3) kokoro_link_tls_json "$address" "${kind#cdn-}" || kokoro_die "TLS profile is unavailable" ;;
+        direct-h2) kokoro_link_tls_json "$address" h2 || kokoro_die "TLS profile is unavailable" ;;
+        cdn-h2|cdn-h3)
+            kokoro_link_tls_json "$address" "${kind#cdn-}" "$(kokoro_cfg '.inbound.tls.split_domain // ""')" ||
+                kokoro_die "TLS profile is unavailable"
+            ;;
     esac
 }
 
@@ -536,7 +540,7 @@ Options:
   --qr                    Print terminal QR codes (requires qrencode)
   --json [tls|reality|hysteria]
                           Print a full Xray client JSON profile
-  UP / DOWN               reality=IP, cdn-h2[=IP], or cdn-h3[=IP]
+  UP / DOWN               reality=IP, direct-h2=IP, cdn-h2[=IP], or cdn-h3[=IP]
 EOF
                 return 0
                 ;;

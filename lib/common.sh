@@ -232,11 +232,24 @@ kokoro_xhttp_split_check() {
           and .inbound.mode == "both" and .caddy.use_l4 == true
           and ($cdn | test("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,63}$"))
           and ($snis | length > 0 and index($cdn) == null)
+          and ($snis | index($cfg.inbound.tls.split_domain // "") == null)
           and (if .inbound.hysteria.enabled then
               $snis | index($cfg.inbound.hysteria.domain | ascii_downcase) == null
             else true end)
     ' "${KOKORO_CONFIG}" >/dev/null ||
         kokoro_die "XHTTP split requires an XHTTP edge in both mode, Caddy L4, and TLS/HY2 domains distinct from the REALITY SNI"
+}
+
+kokoro_xhttp_split_domain_check() {
+    local domain="$1"
+    [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] &&
+        jq -e --arg domain "$domain" '
+            .role == "edge" and .inbound.transport == "xhttp"
+            and (.inbound.mode == "tls" or .inbound.mode == "both")
+            and ([.inbound.tls.cdn_domain, .inbound.hysteria.domain,
+                  .inbound.reality.server_names[]] | map(ascii_downcase) | index($domain) == null)
+        ' "${KOKORO_CONFIG}" >/dev/null ||
+        kokoro_die "split domain requires XHTTP TLS and must differ from existing TLS, HY2 and REALITY names"
 }
 
 kokoro_tls_domain() {

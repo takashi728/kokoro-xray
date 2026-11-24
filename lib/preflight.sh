@@ -29,7 +29,7 @@ kokoro_preflight() {
 kokoro_preflight_paths() { kokoro_validate_service_paths; }
 
 kokoro_preflight_edge() {
-    local mode="$1" cdn="" decryption encryption transport
+    local mode="$1" cdn="" decryption encryption transport split_domain
     transport="$(kokoro_cfg '.inbound.transport // "xhttp"')"
     case "$transport" in
         raw|xhttp) ;;
@@ -42,6 +42,8 @@ kokoro_preflight_edge() {
     if [[ "$(kokoro_cfg '.inbound.xhttp_split')" == true ]]; then
         kokoro_xhttp_split_check
     fi
+    split_domain="$(kokoro_cfg '.inbound.tls.split_domain // ""')"
+    [[ -z "$split_domain" ]] || kokoro_xhttp_split_domain_check "$split_domain"
 
     [[ -n "$(kokoro_sec '.inbound.uuid')" ]] || kokoro_die "missing inbound.uuid in secrets.json"
     [[ "$transport" == raw || -n "$(kokoro_sec '.inbound.xhttp_path')" ]] || kokoro_die "missing inbound.xhttp_path in secrets.json"

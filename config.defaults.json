@@ -16,6 +16,7 @@
     "tls": {
       "domain": "",
       "cdn_domain": "",
+      "split_domain": "",
       "acme_email": ""
     },
     "hysteria": {

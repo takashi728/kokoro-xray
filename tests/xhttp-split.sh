@@ -15,7 +15,7 @@ chmod 600 "$KOKORO_SECRETS"
 cli() { bash "$ROOT/kokoro-xray.sh" "$@"; }
 profile() { cli link --json xhttp-split "$@"; }
 fails() {
-    if "$@" >"$tmp/rejected" 2>"$tmp/error"; then
+    if ("$@") >"$tmp/rejected" 2>"$tmp/error"; then
         echo "unexpected success: $*" >&2
         exit 1
     fi
@@ -50,6 +50,28 @@ jq -e '.outbounds[0].streamSettings | .tlsSettings.alpn == ["h3"]
     and (.xhttpSettings | has("downloadSettings") | not)' "$tmp/h3.json" >/dev/null
 jq -e '.outbounds[0] | .settings.vnext[0].address == "2001:db8::42"
     and (.streamSettings.xhttpSettings | has("downloadSettings") | not)' "$tmp/v6.json" >/dev/null
+
+kokoro_cfg_set_str '.inbound.tls.split_domain' split.example.com
+kokoro_xhttp_split_domain_check split.example.com
+fails kokoro_xhttp_split_domain_check cdn.example.com
+fails kokoro_xhttp_split_domain_check www.cloudflare.com
+fails profile direct-h2
+profile cdn-h3 direct-h2=2001:db8::42 >"$tmp/cdn-direct.json"
+jq -e '
+    .outbounds[0] | .settings.vnext[0].address == "split.example.com"
+    and (.streamSettings | .tlsSettings.serverName == "split.example.com"
+      and .tlsSettings.alpn == ["h3"]
+      and (.xhttpSettings.downloadSettings |
+        .address == "2001:db8::42" and .tlsSettings.serverName == "cdn.example.com"
+        and .tlsSettings.alpn == ["h2"] and .xhttpSettings.host == "cdn.example.com"))
+' "$tmp/cdn-direct.json" >/dev/null
+cli link --json tls | jq -e '.outbounds[0].settings.vnext[0].address == "cdn.example.com"' >/dev/null
+jq -nr -f "$ROOT/lib/caddy.jq" --slurpfile cfg "$KOKORO_CONFIG" \
+    --slurpfile sec "$KOKORO_SECRETS" >"$tmp/Caddyfile"
+grep -Fx 'cdn.example.com {' "$tmp/Caddyfile" >/dev/null
+grep -Fx 'split.example.com {' "$tmp/Caddyfile" >/dev/null
+[[ "$(grep -Fc 'reverse_proxy 127.0.0.1:8444' "$tmp/Caddyfile")" == 2 ]]
+kokoro_cfg_set_str '.inbound.tls.split_domain' ''
 
 kokoro_cfg_set '.inbound.xhttp_split' true
 kokoro_xhttp_split_check

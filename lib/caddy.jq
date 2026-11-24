@@ -8,6 +8,7 @@ def sni: cfg.inbound.reality.server_names[0];
 def tls_enabled: cfg.inbound.mode == "tls" or cfg.inbound.mode == "both";
 def raw_tls: (cfg.inbound.transport // "xhttp") == "raw" and tls_enabled;
 def cdn: (if raw_tls then cfg.inbound.tls.domain else cfg.inbound.tls.cdn_domain end) | ascii_downcase;
+def split_domain: cfg.inbound.tls.split_domain // "";
 def path: sec.inbound.xhttp_path;
 def xhttp_proxy_headers:
   if cfg.inbound.xhttp_split == true then "header_up -X-Forwarded-For"
@@ -54,8 +55,8 @@ def no_h3_block: if hy_enabled and (needs_l4 | not) then
 "
 else "" end;
 
-def tls_site: if tls_enabled and (same_domain | not) and (raw_tls | not) then
-"\(cdn) {
+def xhttp_site($host):
+"\($host) {
     handle \(path)* {
         reverse_proxy 127.0.0.1:8444 {
             \(xhttp_proxy_headers)
@@ -68,7 +69,11 @@ def tls_site: if tls_enabled and (same_domain | not) and (raw_tls | not) then
         respond \"ok\" 200
     }
 }
-"
+";
+
+def tls_site: if tls_enabled and (raw_tls | not) then
+  (if same_domain then "" else xhttp_site(cdn) end)
+  + (if split_domain == "" then "" else xhttp_site(split_domain) end)
 else "" end;
 
 def same_domain_site: if same_domain and (raw_tls | not) then

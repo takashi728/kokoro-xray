@@ -26,6 +26,35 @@ Cloudflare edge. Do not open UDP 443 at the origin for this; existing HY2
 can keep its UDP port. Keep a separate H2 profile for clients whose UDP path
 doesn't work. [Cloudflare HTTP/3](https://developers.cloudflare.com/speed/optimization/protocol/http3/)
 
+### Add a separate Cloudflare name with `cf`
+
+Keep Cloudflare credentials on the operator machine. Use a new subdomain
+in an active zone that already uses Full (strict):
+
+```bash
+bash tools/cf-xhttp-dns.sh prepare example.net split.example.net 192.0.2.42
+```
+
+On the VPS, add the name without replacing the existing TLS or HY2 name:
+
+```bash
+sudo kokoro-xray xhttp-split domain split.example.net
+sudo kokoro-xray apply
+```
+
+When Caddy serves a valid origin certificate, run on the operator machine:
+
+```bash
+bash tools/cf-xhttp-dns.sh proxy example.net split.example.net 192.0.2.42
+```
+
+The helper manages one A or AAAA record, verifies origin HTTPS before
+proxying, and refuses to overwrite unrelated records. It does not change
+zone settings or touch HY2 DNS. To remove the VPS alias, set
+`xhttp-split domain ""` and apply; manage the DNS record separately.
+
+### Mix REALITY and TLS
+
 For mixed REALITY and CDN legs only, enable the shared XHTTP backend:
 
 ```bash
@@ -58,9 +87,13 @@ Upload comes first. Omit the second leg for an unsplit baseline. Replace
 documentation IPs below with measured, reachable addresses. Do not paste
 the generated file into chat or commit it; it contains credentials.
 
-- `cdn-h2` or `cdn-h3` dials the configured CDN hostname. Optional
+- `cdn-h2` or `cdn-h3` dials the split hostname if configured, otherwise the
+  existing TLS hostname. Optional
   `=IP` pins the edge IP while retaining the configured TLS SNI and HTTP
   Host. Start with the hostname before trying a measured edge IP.
+- `direct-h2=IP` dials the origin directly over TLS using the original TLS
+  hostname for SNI and Host. Pair it with a CDN leg without enabling the
+  REALITY bridge, for example `cdn-h3 direct-h2=2001:db8::42`.
 - `reality=IP` dials the origin directly. Use an IPv4 literal or an
   unbracketed IPv6 literal. A VPS having an IPv6 address is not proof it is
   reachable from the client. Verify from the client network.

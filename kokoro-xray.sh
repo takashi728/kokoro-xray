@@ -44,15 +44,25 @@ kokoro_dispatch() {
         apply)   source "${KOKORO_ROOT}/lib/apply.sh"; kokoro_apply ;;
         xhttp-split)
             kokoro_need_root
-            [[ $# == 1 ]] || kokoro_die "usage: kokoro-xray xhttp-split on|off"
+            local usage="usage: kokoro-xray xhttp-split on|off|domain NAME"
             case "${1:-}" in
                 on)
+                    [[ $# == 1 ]] || kokoro_die "$usage"
                     kokoro_xhttp_split_check
                     kokoro_cfg_set '.inbound.xhttp_split' 'true'
                     kokoro_warn "re-export existing REALITY client JSON after applying"
                     ;;
-                off) kokoro_cfg_set '.inbound.xhttp_split' 'false' ;;
-                *) kokoro_die "usage: kokoro-xray xhttp-split on|off" ;;
+                off)
+                    [[ $# == 1 ]] || kokoro_die "$usage"
+                    kokoro_cfg_set '.inbound.xhttp_split' 'false'
+                    ;;
+                domain)
+                    [[ $# == 2 ]] || kokoro_die "$usage"
+                    local domain="${2,,}"
+                    [[ -z "$domain" ]] || kokoro_xhttp_split_domain_check "$domain"
+                    kokoro_cfg_set_str '.inbound.tls.split_domain' "$domain"
+                    ;;
+                *) kokoro_die "$usage" ;;
             esac
             kokoro_log "saved; run kokoro-xray apply to activate"
             ;;
