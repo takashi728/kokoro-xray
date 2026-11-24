@@ -5,12 +5,30 @@
 source "${KOKORO_ROOT}/lib/common.sh"
 
 kokoro_raw_tls_domain_check() {
-    local domain="$1" ip ips
+    local domain="$1" ipv4="${KOKORO_PUBLIC_ADDRESS:-}" local_ipv6 answers address
+    local -a resolver=(getent)
     [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] || return 1
-    ip="${KOKORO_PUBLIC_ADDRESS:-}"
-    [[ -n "$ip" ]] || ip="$(curl -4 -fsS --connect-timeout 3 --max-time 8 https://api.ipify.org)" || return 1
-    ips="$(timeout 8 getent ahostsv4 "$domain" | awk '{print $1}' | sort -u)"
-    [[ -n "$ip" && "$ips" == "$ip" ]]
+    # Check both record types even when one family is not configured locally.
+    if getent --no-addrconfig --help >/dev/null 2>&1; then
+        resolver+=(--no-addrconfig)
+    fi
+    answers="$(timeout 8 "${resolver[@]}" ahosts "$domain")" || return 1
+    answers="$(awk 'NF {print $1}' <<<"$answers" | sort -u)"
+    [[ -n "$answers" ]] || return 1
+
+    if [[ "$answers" == *:* ]]; then
+        local_ipv6="$(ip -j -6 address show scope global | jq -r '
+            .[].addr_info[] | select(.tentative != true and .dadfailed != true) | .local
+        ')" || return 1
+    fi
+    while IFS= read -r address; do
+        if [[ "$address" == *:* ]]; then
+            grep -Fxq -- "$address" <<<"$local_ipv6" || return 1
+        else
+            [[ -n "$ipv4" ]] || ipv4="$(curl -4 -fsS --connect-timeout 3 --max-time 8 https://api.ipify.org)" || return 1
+            [[ "$address" == "$ipv4" ]] || return 1
+        fi
+    done <<<"$answers"
 }
 
 kokoro_onboard_reality_target() {

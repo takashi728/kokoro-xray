@@ -29,11 +29,11 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 ## Install
 
 The reviewed installer commit is
-`44cdd9a81c762166441401a33cbca159ee1e5cea`. Download the bootstrap from that
+`4fb7bdc1b4dd354bd52eea498a5eab3bb7d631bc`. Download the bootstrap from that
 immutable revision and pass the same SHA to it:
 
 ```bash
-commit=44cdd9a81c762166441401a33cbca159ee1e5cea
+commit=4fb7bdc1b4dd354bd52eea498a5eab3bb7d631bc
 curl -fsSL "https://raw.githubusercontent.com/takashi728/kokoro-xray/${commit}/install.sh" \
     -o /tmp/kokoro-install.sh
 sudo env KOKORO_REPO_COMMIT="$commit" bash /tmp/kokoro-install.sh
@@ -136,8 +136,8 @@ exception does not disable payload encryption on REALITY or XHTTP profiles.
 - `raw` + `reality`: Xray listens directly on TCP/443 unless both mode or HY2
   requires Caddy routing. The standard REALITY target scan still applies.
 - `raw` + `tls`: requires a direct domain in `.inbound.tls.domain`, DNS-only
-  and pointing to this VPS. The setup checks the IPv4 records. Any IPv6 record
-  must also point to this VPS. Ordinary HTTP CDN proxying cannot carry RAW/Vision.
+  and pointing to this VPS. A, AAAA, or both are supported. All returned
+  addresses must point to this VPS. Ordinary HTTP CDN proxying cannot carry RAW/Vision.
 - `raw` + `both`: Caddy routes REALITY SNI to Xray loopback TCP/8443 and the
   direct TLS SNI to loopback TCP/8444. Xray terminates RAW TLS itself; Caddy
   does not terminate the Vision transport.

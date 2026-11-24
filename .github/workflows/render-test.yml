@@ -64,7 +64,9 @@ jobs:
           XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
           bash tests/hysteria-hop.sh
       - name: Run RAW Vision tests
-        run: PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
+        run: |
+          bash tests/raw-tls-domain.sh
+          PATH=/tmp/kokoro-xray-ci:$PATH bash tests/raw-vision.sh
       - name: Run XHTTP split tests
         run: XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/xhttp-split.sh
       - name: Live REALITY probe (github.com)
