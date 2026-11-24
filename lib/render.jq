@@ -26,6 +26,7 @@ def reality_listen: if mode == "reality" and (hysteria_enabled | not) then "0.0.
 def reality_port: if mode == "reality" and (hysteria_enabled | not) then 443 else 8443 end;
 def reality_sockopt: if reality_listen == "127.0.0.1" then { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] } else {} end;
 def tls_sockopt: { trustedXForwardedFor: ["Kokoro-Trusted-XFF"] };
+def xhttp_split: cfg.inbound.xhttp_split == true;
 def xhttp_base_settings: { path: sec.inbound.xhttp_path };
 def xhttp_tls_settings: xhttp_base_settings + {
   mode: "auto",
@@ -66,6 +67,17 @@ def reality_inbound: {
     + if raw then {routeOnly: true} else {} end)
 };
 
+def reality_xhttp_bridge: reality_inbound
+  | .tag = "REALITY_XHTTP_BRIDGE"
+  | .streamSettings |= (del(.xhttpSettings, .sockopt) | .network = "raw")
+  | .settings = {
+      clients: [],
+      decryption: "none",
+      # The REALITY wrapper can report an empty ALPN even for XHTTP H2.
+      fallbacks: [{dest: "127.0.0.1:8444", xver: 0}]
+    }
+  | del(.sniffing);
+
 def tls_inbound: {
   tag: (if raw then "TLS_RAW_IN" else "TLS_XHTTP_IN" end),
   listen: "127.0.0.1",
@@ -86,7 +98,8 @@ def tls_inbound: {
     network: transport,
     security: "none",
     xhttpSettings: xhttp_tls_settings,
-    sockopt: tls_sockopt
+    # The direct REALITY leg bypasses Caddy and must not be able to spoof XFF.
+    sockopt: (if xhttp_split then {trustedXForwardedFor: []} else tls_sockopt end)
   } end),
   sniffing: ({ enabled: true, destOverride: ["http", "tls", "quic"] }
     + if raw then {routeOnly: true} else {} end)
@@ -246,7 +259,8 @@ def edge_multinode_routing: {
 def edge_routing: if cfg.multinode.enabled then edge_multinode_routing else edge_single_routing end;
 
 def edge_inbounds:
-  (if mode == "reality" or mode == "both" then [reality_inbound] else [] end)
+  (if xhttp_split then [reality_xhttp_bridge]
+   elif mode == "reality" or mode == "both" then [reality_inbound] else [] end)
   + (if mode == "tls" or mode == "both" then [tls_inbound] else [] end)
   + (if hysteria_enabled then [hysteria_inbound] else [] end);
 

@@ -39,6 +39,9 @@ kokoro_preflight_edge() {
         reality|tls|both) ;;
         *) kokoro_die "invalid inbound.mode: $mode" ;;
     esac
+    if [[ "$(kokoro_cfg '.inbound.xhttp_split')" == true ]]; then
+        kokoro_xhttp_split_check
+    fi
 
     [[ -n "$(kokoro_sec '.inbound.uuid')" ]] || kokoro_die "missing inbound.uuid in secrets.json"
     [[ "$transport" == raw || -n "$(kokoro_sec '.inbound.xhttp_path')" ]] || kokoro_die "missing inbound.xhttp_path in secrets.json"

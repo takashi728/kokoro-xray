@@ -45,9 +45,13 @@ kokoro_link_tls_url() {
 
 kokoro_link_reality_url() {
     kokoro_ensure_state
-    local uuid path sni pub sid mode host encryption
+    local uuid path sni pub sid mode host encryption transport
     mode="$(kokoro_cfg '.inbound.mode')"
     [[ "$mode" == "reality" || "$mode" == "both" ]] || return 0
+    transport="$(kokoro_cfg '.inbound.transport // "xhttp"')"
+    if [[ "$transport" == xhttp && "$(kokoro_cfg '.inbound.xhttp_split')" == true ]]; then
+        return 0
+    fi
     uuid="$(kokoro_sec '.inbound.uuid')"
     path="$(kokoro_sec '.inbound.xhttp_path')"
     sni="$(kokoro_cfg '.inbound.reality.server_names[0]')"
@@ -55,7 +59,7 @@ kokoro_link_reality_url() {
     sid="$(kokoro_sec '.inbound.reality.short_ids[0]')"
     encryption="$(kokoro_link_vless_encryption)"
     host="$(kokoro_link_public_address)"
-    if [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw ]]; then
+    if [[ "$transport" == raw ]]; then
         [[ "$host" == *:* ]] && host="[$host]"
         printf 'vless://%s@%s:443?encryption=%s&security=reality&type=tcp&flow=xtls-rprx-vision-udp443&pbk=%s&fp=chrome&sni=%s&sid=%s#kokoro-raw-reality\n' \
             "$uuid" "$host" "$encryption" "$pub" "$sni" "$sid"
@@ -194,6 +198,8 @@ kokoro_link_vless_json() {
         --arg path "$path" \
         --arg uuid "$uuid" \
         --arg encryption "$encryption" \
+        --arg alpn "${10:-h2}" \
+        --argjson split "$(kokoro_cfg '.inbound.xhttp_split == true')" \
         --arg transport "$(kokoro_cfg '.inbound.transport // "xhttp"')" \
         '
           def xhttp_base_settings:
@@ -207,7 +213,7 @@ kokoro_link_vless_json() {
             };
 
           def xhttp_settings:
-            if $security == "tls" then
+            if $security == "tls" or $split then
               xhttp_base_settings + {
                 host: $server_name,
                 mode: "auto",
@@ -238,7 +244,7 @@ kokoro_link_vless_json() {
                 tlsSettings: {
                   serverName: $server_name,
                   fingerprint: "chrome",
-                  alpn: (if $transport == "raw" then ["h2", "http/1.1"] else ["h2"] end)
+                  alpn: (if $transport == "raw" then ["h2", "http/1.1"] else [$alpn] end)
                 }
               } + (if $transport == "xhttp" then {xhttpSettings: xhttp_settings} else {} end)
             elif $security == "reality" then
@@ -392,7 +398,7 @@ kokoro_link_vless_json() {
 
 kokoro_link_tls_json() {
     kokoro_ensure_state
-    local uuid path mode cdn encryption
+    local uuid path mode cdn encryption address="${1:-}" alpn="${2:-h2}"
     mode="$(kokoro_cfg '.inbound.mode')"
     [[ "$mode" == "tls" || "$mode" == "both" ]] || return 1
     uuid="$(kokoro_sec '.inbound.uuid')"
@@ -401,8 +407,8 @@ kokoro_link_tls_json() {
     encryption="$(kokoro_link_vless_encryption tls)"
     [[ -n "$cdn" && "$cdn" != "null" ]] || return 1
 
-    kokoro_link_vless_json "$cdn" "kokoro-tls" "tls" "$cdn" "" "" \
-        "$path" "$uuid" "$encryption"
+    kokoro_link_vless_json "${address:-$cdn}" "kokoro-tls" "tls" "$cdn" "" "" \
+        "$path" "$uuid" "$encryption" "$alpn"
 }
 
 kokoro_link_reality_json() {
@@ -416,13 +422,61 @@ kokoro_link_reality_json() {
     public_key="$(kokoro_sec '.inbound.reality.public_key')"
     short_id="$(kokoro_sec '.inbound.reality.short_ids[0]')"
     encryption="$(kokoro_link_vless_encryption)"
-    address="$(kokoro_link_public_address)"
+    address="${1:-}"
+    [[ -n "$address" ]] || address="$(kokoro_link_public_address)"
     [[ -n "$uuid" && -n "$sni" && -n "$public_key" && -n "$short_id" ]] ||
         return 1
     [[ "$(kokoro_cfg '.inbound.transport // "xhttp"')" == raw || -n "$path" ]] || return 1
 
     kokoro_link_vless_json "$address" "kokoro-reality" "reality" "$sni" \
         "$public_key" "$short_id" "$path" "$uuid" "$encryption"
+}
+
+kokoro_link_xhttp_leg() {
+    local spec="$1" kind="${1%%=*}" address=""
+    case "$kind" in
+        reality|cdn-h2|cdn-h3) ;;
+        *) kokoro_die "unknown leg: $kind (use reality=IP, cdn-h2[=IP], or cdn-h3[=IP])" ;;
+    esac
+    [[ "$spec" != *=* ]] || address="${spec#*=}"
+    if [[ "$kind" == reality || "$spec" == *=* ]]; then
+        source "${KOKORO_ROOT}/lib/reality-asn.sh"
+        kokoro_reality_ip_literal "$address" ||
+            kokoro_die "use a literal IPv4 or unbracketed IPv6 address for $kind"
+    fi
+    case "$kind" in
+        reality) kokoro_link_reality_json "$address" || kokoro_die "REALITY profile is unavailable" ;;
+        cdn-h2|cdn-h3) kokoro_link_tls_json "$address" "${kind#cdn-}" || kokoro_die "TLS profile is unavailable" ;;
+    esac
+}
+
+kokoro_link_xhttp_split_json() {
+    [[ $# -ge 1 && $# -le 2 ]] ||
+        kokoro_die "usage: kokoro-xray link --json xhttp-split UP [DOWN]"
+    kokoro_ensure_state
+    [[ "$(kokoro_cfg '.role == "edge" and .inbound.transport == "xhttp"')" == true ]] ||
+        kokoro_die "XHTTP profiles require an XHTTP edge"
+    [[ -n "$(kokoro_sec '.inbound.uuid')" && -n "$(kokoro_sec '.inbound.xhttp_path')" ]] ||
+        kokoro_die "XHTTP credentials missing; finish edge setup first"
+    local up down
+    if [[ $# == 2 && ( "${1%%=*}" == reality || "${2%%=*}" == reality ) &&
+          "${1%%=*}" != "${2%%=*}" ]]; then
+        [[ "$(kokoro_cfg '.inbound.xhttp_split')" == true ]] ||
+            kokoro_die "mixed legs require xhttp-split on, then apply"
+        kokoro_xhttp_split_check
+    fi
+    up="$(kokoro_link_xhttp_leg "$1")" || return 1
+    if [[ $# == 1 ]]; then
+        printf '%s\n' "$up"
+        return
+    fi
+    down="$(kokoro_link_xhttp_leg "$2")" || return 1
+    jq --slurpfile down <(printf '%s\n' "$down") '
+        $down[0].outbounds[0] as $leg
+        | .outbounds[0].streamSettings.xhttpSettings.downloadSettings = (
+                $leg.streamSettings + ($leg.settings.vnext[0] | {address, port})
+            )
+    ' <<<"$up"
 }
 
 kokoro_link_qr_ensure() {
@@ -453,6 +507,11 @@ kokoro_link_show() {
         case "$1" in
             --qr) show_qr=true; shift ;;
             --json)
+                if [[ "${2:-}" == xhttp-split ]]; then
+                    shift 2
+                    kokoro_link_xhttp_split_json "$@"
+                    return $?
+                fi
                 if [[ $# -ge 2 && "${2:-}" != -* ]]; then
                     [[ "$2" == "tls" || "$2" == "reality" || "$2" == "hysteria" ]] ||
                         kokoro_die "unknown JSON profile: $2 (expected tls, reality, or hysteria)"
@@ -471,11 +530,13 @@ Usage:
   kokoro-xray link
   kokoro-xray link --qr
   kokoro-xray link --json [tls|reality|hysteria]
+  kokoro-xray link --json xhttp-split UP [DOWN]
 
 Options:
   --qr                    Print terminal QR codes (requires qrencode)
   --json [tls|reality|hysteria]
                           Print a full Xray client JSON profile
+  UP / DOWN               reality=IP, cdn-h2[=IP], or cdn-h3[=IP]
 EOF
                 return 0
                 ;;
@@ -504,6 +565,9 @@ EOF
     reality_url="$(kokoro_link_reality_url)"
     tls_url="$(kokoro_link_tls_url)"
     hysteria_url="$(kokoro_link_hysteria_url)"
+    if [[ "$(kokoro_cfg '.inbound.xhttp_split')" == true ]]; then
+        kokoro_warn "REALITY share URL unavailable in split mode; use link --json reality"
+    fi
 
     [[ -n "$reality_url" || -n "$tls_url" || -n "$hysteria_url" ]] ||
         kokoro_die "no links for role/mode (edge required)"

@@ -8,6 +8,8 @@ kokoro_reality_ip_literal() {
     local -a octets
     if [[ "$ip" == *:* ]]; then
         [[ "$ip" =~ ^[0-9a-fA-F:]+$ && "$ip" != *:::* ]] || return 1
+        [[ "$ip" != :* || "$ip" == ::* ]] || return 1
+        [[ "$ip" != *: || "$ip" == *:: ]] || return 1
         IFS=: read -ra octets <<<"$ip"
         for octet in "${octets[@]}"; do
             [[ "${#octet}" -le 4 ]] || return 1
@@ -22,7 +24,8 @@ kokoro_reality_ip_literal() {
         [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
         IFS=. read -ra octets <<<"$ip"
         for octet in "${octets[@]}"; do
-            [[ "${#octet}" -le 3 ]] && (( 10#$octet <= 255 )) || return 1
+            [[ "${#octet}" -le 3 && ( "$octet" == 0 || "$octet" != 0* ) ]] &&
+                (( 10#$octet <= 255 )) || return 1
         done
     fi
 }

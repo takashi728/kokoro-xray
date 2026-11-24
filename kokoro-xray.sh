@@ -35,13 +35,27 @@ kokoro_dispatch() {
     case "$cmd" in
         edge)    bash "${KOKORO_ROOT}/roles/edge.sh" "$@" ;;
         exit)    bash "${KOKORO_ROOT}/roles/exit.sh" "$@" ;;
-        link)    bash "${KOKORO_ROOT}/roles/client.sh" "$@" ;;
+        link)    bash "${KOKORO_ROOT}/roles/client.sh" "$@" || exit $? ;;
         firewall)
             shift || true
             source "${KOKORO_ROOT}/lib/firewall.sh"
             kokoro_firewall_cli "$@"
             ;;
         apply)   source "${KOKORO_ROOT}/lib/apply.sh"; kokoro_apply ;;
+        xhttp-split)
+            kokoro_need_root
+            [[ $# == 1 ]] || kokoro_die "usage: kokoro-xray xhttp-split on|off"
+            case "${1:-}" in
+                on)
+                    kokoro_xhttp_split_check
+                    kokoro_cfg_set '.inbound.xhttp_split' 'true'
+                    kokoro_warn "re-export existing REALITY client JSON after applying"
+                    ;;
+                off) kokoro_cfg_set '.inbound.xhttp_split' 'false' ;;
+                *) kokoro_die "usage: kokoro-xray xhttp-split on|off" ;;
+            esac
+            kokoro_log "saved; run kokoro-xray apply to activate"
+            ;;
         outbound-proxy)
             source "${KOKORO_ROOT}/lib/onboard.sh"
             kokoro_manage_outbound_proxy "$@" || exit $?

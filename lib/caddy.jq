@@ -9,6 +9,9 @@ def tls_enabled: cfg.inbound.mode == "tls" or cfg.inbound.mode == "both";
 def raw_tls: (cfg.inbound.transport // "xhttp") == "raw" and tls_enabled;
 def cdn: (if raw_tls then cfg.inbound.tls.domain else cfg.inbound.tls.cdn_domain end) | ascii_downcase;
 def path: sec.inbound.xhttp_path;
+def xhttp_proxy_headers:
+  if cfg.inbound.xhttp_split == true then "header_up -X-Forwarded-For"
+  else "header_up Kokoro-Trusted-XFF 1" end;
 def hy_enabled: cfg.inbound.hysteria.enabled;
 def hy_domain: cfg.inbound.hysteria.domain | ascii_downcase;
 def hy_masquerade: cfg.inbound.hysteria.masquerade | ascii_downcase | split(".") | map(@uri) | join(".");
@@ -55,7 +58,7 @@ def tls_site: if tls_enabled and (same_domain | not) and (raw_tls | not) then
 "\(cdn) {
     handle \(path)* {
         reverse_proxy 127.0.0.1:8444 {
-            header_up Kokoro-Trusted-XFF 1
+            \(xhttp_proxy_headers)
             transport http {
                 versions h2c
             }
@@ -72,7 +75,7 @@ def same_domain_site: if same_domain and (raw_tls | not) then
 "\(cdn) {
     handle \(path)* {
         reverse_proxy 127.0.0.1:8444 {
-            header_up Kokoro-Trusted-XFF 1
+            \(xhttp_proxy_headers)
             transport http {
                 versions h2c
             }

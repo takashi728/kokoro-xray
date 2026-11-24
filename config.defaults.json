@@ -5,6 +5,7 @@
   "inbound": {
     "mode": "both",
     "transport": "xhttp",
+    "xhttp_split": false,
     "vless_encryption": {
       "enabled": true
     },

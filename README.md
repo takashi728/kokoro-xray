@@ -202,6 +202,8 @@ kokoro-xray link --json hysteria
 
 ### TLS XHTTP with Cloudflare
 
+For the experimental upload/download split, see the [XHTTP split guide](docs/xhttp-split.md).
+
 1. Start with a **DNS-only** record pointing to your VPS.
 2. Run `sudo kokoro-xray edge`. Choose `xhttp`, then `tls`. Enter the hostname
    and check that HTTPS works before continuing.

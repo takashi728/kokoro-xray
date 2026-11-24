@@ -224,6 +224,21 @@ kokoro_raw_tls_enabled() {
        "$(kokoro_cfg '.inbound.mode')" =~ ^(tls|both)$ ]]
 }
 
+kokoro_xhttp_split_check() {
+    jq -e '
+        . as $cfg | (.inbound.tls.cdn_domain // "" | ascii_downcase) as $cdn
+        | [.inbound.reality.server_names[] | ascii_downcase] as $snis
+        | .role == "edge" and .inbound.transport == "xhttp"
+          and .inbound.mode == "both" and .caddy.use_l4 == true
+          and ($cdn | test("^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,63}$"))
+          and ($snis | length > 0 and index($cdn) == null)
+          and (if .inbound.hysteria.enabled then
+              $snis | index($cfg.inbound.hysteria.domain | ascii_downcase) == null
+            else true end)
+    ' "${KOKORO_CONFIG}" >/dev/null ||
+        kokoro_die "XHTTP split requires an XHTTP edge in both mode, Caddy L4, and TLS/HY2 domains distinct from the REALITY SNI"
+}
+
 kokoro_tls_domain() {
     if kokoro_raw_tls_enabled; then kokoro_cfg '.inbound.tls.domain'
     else kokoro_cfg '.inbound.tls.cdn_domain'; fi
