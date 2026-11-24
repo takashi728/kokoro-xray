@@ -28,10 +28,19 @@ kokoro_sec_set_str '.inbound.hysteria.auth' fixture-auth
 kokoro_sec_set_str '.inbound.hysteria.obfs_password' fixture-obfs
 cli() { bash "$ROOT/kokoro-xray.sh" link --json "$@"; }
 combine() { bash "$ROOT/tools/xhttp-round-robin.sh" "$@"; }
-cli xhttp-split direct-h2=192.0.2.42 >"$tmp/direct.json"
+cli xhttp-split direct-h2=192.0.2.42 |
+    jq '.outbounds[0].streamSettings.xhttpSettings.mode = "stream-one"' >"$tmp/direct.json"
 cli xhttp-split cdn-h2 direct-h2=2001:db8::42 >"$tmp/split.json"
 cli hysteria >"$tmp/hy2.json"
 combine "$tmp/direct.json" "$tmp/split.json" "$tmp/hy2.json" >"$tmp/round.json"
+cli round-robin 192.0.2.42 cdn-h2 direct-h2=2001:db8::42 >"$tmp/installed.json"
+cmp "$tmp/round.json" "$tmp/installed.json"
+kokoro_cfg_set '.inbound.hysteria.enabled' false
+if cli round-robin 192.0.2.42 cdn-h2 direct-h2=2001:db8::42 >"$tmp/rejected" 2>"$tmp/error"; then
+    echo 'round-robin export accepted disabled HY2' >&2; exit 1
+fi
+[[ ! -s "$tmp/rejected" ]]
+grep -Fq 'requires an enabled Hysteria2 profile' "$tmp/error"
 if combine "$tmp/split.json" "$tmp/direct.json" "$tmp/hy2.json" >/dev/null 2>&1; then
     echo 'wrong profile order was accepted' >&2; exit 1
 fi

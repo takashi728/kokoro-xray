@@ -1,7 +1,22 @@
 # XHTTP and HY2 round robin
 
-Combine three local Kokoro client exports. No VPS or DNS changes are needed.
-Use Xray-core v26.11.9 and import the result as a custom Xray JSON profile.
+Install or update using the pinned installer in this branch's README. Updating
+the program does not restart Xray or Caddy. On an already configured XHTTP TLS
+edge with HY2 enabled, export a combined profile:
+
+```bash
+umask 077
+sudo kokoro-xray link --json round-robin 192.0.2.42 cdn-h2 direct-h2=2001:db8::42 > round-robin.json
+```
+
+Replace the example addresses with reachable VPS IPs. The first argument
+selects the standalone direct H2 route in streaming mode. The next two
+arguments are the [split upload and download legs](xhttp-split.md#export-a-profile).
+Use `cdn-h2=IP` to pin a measured Cloudflare address while preserving TLS SNI.
+No new server listener or DNS record is needed for the balancer itself.
+Import the result as a custom Xray JSON profile using Xray-core v26.11.9.
+
+You can also combine three existing client exports without updating the VPS:
 
 ```bash
 umask 077

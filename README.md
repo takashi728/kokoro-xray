@@ -66,6 +66,9 @@ configs, run:
 sudo kokoro-xray apply
 ```
 
+For an experimental combined client export, see the
+[round-robin guide](docs/xhttp-round-robin.md). Exporting does not reload services.
+
 Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 
 ```bash

@@ -53,6 +53,9 @@ run_installer "$commit" >/dev/null
 [[ "$(cat "${state}/.kokoro-xray/installed-commit")" == "$commit" ]]
 [[ "$(cat "${install_dir}/.kokoro-install-commit")" == "$commit" ]]
 [[ "$(stat -c '%a' "${install_dir}/install.sh")" == "755" ]]
+[[ -f "${install_dir}/tools/xhttp-round-robin.sh" ]]
+HOME="$state" bash "${stub_bin}/kokoro-xray" link --help >"${TMP}/link-help"
+grep -Fq 'link --json round-robin DIRECT_IP UP DOWN' "${TMP}/link-help"
 
 printf 'sentinel\n' >"${install_dir}/sentinel"
 before="$(sha256sum "${install_dir}/sentinel" | awk '{print $1}')"

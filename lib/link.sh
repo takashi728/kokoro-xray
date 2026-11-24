@@ -483,6 +483,20 @@ kokoro_link_xhttp_split_json() {
     ' <<<"$up"
 }
 
+kokoro_link_round_robin_json() {
+    [[ $# == 3 ]] ||
+        kokoro_die "usage: kokoro-xray link --json round-robin DIRECT_IP UP DOWN"
+    local direct split hy2
+    hy2="$(kokoro_link_hysteria_json)" ||
+        kokoro_die "round robin requires an enabled Hysteria2 profile"
+    direct="$(kokoro_link_xhttp_split_json "direct-h2=$1")" || return 1
+    split="$(kokoro_link_xhttp_split_json "$2" "$3")" || return 1
+    direct="$(jq '.outbounds[0].streamSettings.xhttpSettings.mode = "stream-one"' <<<"$direct")" ||
+        return 1
+    bash "${KOKORO_ROOT}/tools/xhttp-round-robin.sh" \
+        <(printf '%s\n' "$direct") <(printf '%s\n' "$split") <(printf '%s\n' "$hy2")
+}
+
 kokoro_link_qr_ensure() {
     command -v qrencode >/dev/null 2>&1 && return 0
     if [[ "${EUID}" -eq 0 ]]; then
@@ -511,11 +525,10 @@ kokoro_link_show() {
         case "$1" in
             --qr) show_qr=true; shift ;;
             --json)
-                if [[ "${2:-}" == xhttp-split ]]; then
-                    shift 2
-                    kokoro_link_xhttp_split_json "$@"
-                    return $?
-                fi
+                case "${2:-}" in
+                    xhttp-split) shift 2; kokoro_link_xhttp_split_json "$@"; return $? ;;
+                    round-robin) shift 2; kokoro_link_round_robin_json "$@"; return $? ;;
+                esac
                 if [[ $# -ge 2 && "${2:-}" != -* ]]; then
                     [[ "$2" == "tls" || "$2" == "reality" || "$2" == "hysteria" ]] ||
                         kokoro_die "unknown JSON profile: $2 (expected tls, reality, or hysteria)"
@@ -535,12 +548,14 @@ Usage:
   kokoro-xray link --qr
   kokoro-xray link --json [tls|reality|hysteria]
   kokoro-xray link --json xhttp-split UP [DOWN]
+  kokoro-xray link --json round-robin DIRECT_IP UP DOWN
 
 Options:
   --qr                    Print terminal QR codes (requires qrencode)
   --json [tls|reality|hysteria]
                           Print a full Xray client JSON profile
   UP / DOWN               reality=IP, direct-h2=IP, cdn-h2[=IP], or cdn-h3[=IP]
+  DIRECT_IP               IPv4 or unbracketed IPv6 for the standalone direct H2 path
 EOF
                 return 0
                 ;;
