@@ -122,3 +122,6 @@ loopback payload test with an emulated CDN. That is not a mainland test.
 
 See the [upstream research and measurement plan](xhttp-split-research.md)
 for sources and details.
+
+For an optional client-side profile that rotates HY2, direct XHTTP, and
+split XHTTP, see the [round-robin experiment](xhttp-round-robin.md).
