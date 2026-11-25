@@ -5,6 +5,10 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "$0")"
 export KOKORO_ROOT="$(cd -P -- "$(dirname -- "$SCRIPT_PATH")" && pwd -P)"
+if [[ "${1:-}" == speed ]]; then
+    shift
+    exec python3 "${KOKORO_ROOT}/tools/xray-speed.py" "$@"
+fi
 source "${KOKORO_ROOT}/lib/common.sh"
 
 kokoro_ensure_state

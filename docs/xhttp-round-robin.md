@@ -1,5 +1,8 @@
 # XHTTP and HY2 round robin
 
+For automatic selection by measured upload and download speed, use the
+[client-side speed selector](xray-speed.md).
+
 Install or update using the pinned installer in this branch's README. Updating
 the program does not restart Xray or Caddy. On an already configured XHTTP TLS
 edge with HY2 enabled, export a combined profile:

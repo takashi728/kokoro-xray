@@ -4,6 +4,8 @@ set -euo pipefail
 
 : "${CADDY_BIN:?set CADDY_BIN to Caddy with caddy-l4}"
 XRAY_BIN="${XRAY_BIN:-$(command -v xray)}"
+NODE_BIN="${NODE_BIN:-$(command -v node)}"
+CURL_BIN="${CURL_BIN:-$(command -v curl)}"
 ROOT="$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)"
 tmp="$(mktemp -d)"
 pids=()
@@ -78,7 +80,7 @@ jq -nr -f "$ROOT/lib/caddy.jq" --slurpfile cfg "$KOKORO_CONFIG" \
 ' >"$tmp/caddy.json"
 
 openssl rand -out "$tmp/payload" 1048576
-node -e '
+"$NODE_BIN" -e '
     require("node:http").createServer((req, res) => {
         if (req.method === "POST") req.pipe(res);
         else res.end("ready");
@@ -91,7 +93,7 @@ pids+=("$!")
 pids+=("$!")
 
 probe() {
-    curl -fsS --noproxy '*' --max-time 2 --cacert "$tmp/tls.crt" "$@"
+    "$CURL_BIN" -fsS --noproxy '*' --max-time 2 --cacert "$tmp/tls.crt" "$@"
 }
 for i in {1..30}; do
     if probe --resolve cdn.example:15443:127.0.0.1 https://cdn.example:15443/ >/dev/null 2>&1; then break; fi
@@ -129,7 +131,7 @@ run_profile() {
         kill -0 "$client"
         sleep 0.1
     done
-    curl --noproxy '' --socks5 127.0.0.1:19108 -fsS --max-time 12 \
+    "$CURL_BIN" --noproxy '' --socks5 127.0.0.1:19108 -fsS --max-time 12 \
         --data-binary @"$tmp/payload" http://127.0.0.1:18081/ >"$tmp/received"
     cmp "$tmp/payload" "$tmp/received"
     grep -q "$wanted" "$tmp/client.log"
