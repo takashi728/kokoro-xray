@@ -66,8 +66,9 @@ configs, run:
 sudo kokoro-xray apply
 ```
 
-For an experimental combined client export, see the
-[round-robin guide](docs/xhttp-round-robin.md). Exporting does not reload services.
+To switch nodes or inbound profiles by measured upload and download speed,
+run the [experimental speed selector](docs/xray-speed.md) from this source checkout.
+For a single client JSON that rotates healthy paths, see the [round-robin guide](docs/xhttp-round-robin.md).
 
 Clean reinstall removes `/opt/kokoro-xray` and keeps `~/.kokoro-xray`:
 
