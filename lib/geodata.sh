@@ -42,8 +42,8 @@ kokoro_xray_download_release_zip() {
     expected="$(kokoro_xray_sha256 "$KOKORO_XRAY_VERSION" "$(kokoro_xray_release_arch)")" ||
         kokoro_die "no pinned SHA-256 for $KOKORO_XRAY_VERSION/$(kokoro_xray_release_arch)"
     base_url="https://github.com/XTLS/Xray-core/releases/download/${KOKORO_XRAY_VERSION}"
-    curl -fsSL "${base_url}/${zip}" -o "${tmp}/${zip}"
-    kokoro_xray_verify_zip "${tmp}/${zip}" "$expected"
+    curl --proto '=https' --proto-redir '=https' -fsSL "${base_url}/${zip}" -o "${tmp}/${zip}" || return 1
+    kokoro_xray_verify_zip "${tmp}/${zip}" "$expected" || return 1
     printf '%s\n' "$zip"
 }
 
@@ -52,8 +52,8 @@ kokoro_geodata_install() {
     kokoro_validate_service_paths
     geo_dir="$(kokoro_cfg '.paths.geo_dir')"
     tmp="$(mktemp -d)"
-    zip="$(kokoro_xray_download_release_zip "$tmp")"
-    unzip -qo "${tmp}/${zip}" -d "$tmp"
+    zip="$(kokoro_xray_download_release_zip "$tmp")" && unzip -qo "${tmp}/${zip}" -d "$tmp" ||
+        { rm -rf -- "$tmp"; kokoro_die "failed to obtain verified Xray geodata"; }
     install -d "$geo_dir"
     install -m 644 "${tmp}/geoip.dat" "${tmp}/geosite.dat" "$geo_dir/"
     rm -rf "$tmp"

@@ -157,7 +157,7 @@ kokoro_go_download() { # version arch tmp
     local sha url="https://go.dev/dl/go${1}.linux-${2}.tar.gz"
     sha="$(kokoro_go_sha256 "$1" "$2")" ||
         kokoro_die "no pinned SHA-256 for Go ${1} linux-${2}"
-    curl -fsSL "$url" -o "${3}/go.tgz"
+    curl --proto '=https' --proto-redir '=https' -fsSL "$url" -o "${3}/go.tgz" || return 1
     printf '%s  %s\n' "$sha" "${3}/go.tgz" | sha256sum -c - >/dev/null
 }
 
@@ -219,19 +219,23 @@ kokoro_go_for_caddy() {
     kokoro_log "using Go ${version} for Caddy build"
 }
 
+kokoro_caddy_l4_sha256() { # caddy-version-l4-version arch
+    case "$1/$2" in
+        v2.11.9-v0.1.3/amd64) printf '%s\n' ea47e309445d507be7101e1a3500b75d3962aa9aa64d208c369b46e83db4a512 ;;
+        v2.11.9-v0.1.3/arm64) printf '%s\n' 281ba043991d4b1f6ef4e7f05dbab3b3fe0eab7c49afc8751fffd6af939ae334 ;;
+        *) return 1 ;;
+    esac
+}
+
 kokoro_caddy_download() { # version staged-binary
     local version="$1" staged="$2" arch filename digest url archive release
     arch="$(kokoro_go_arch)" || return 1
     [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
     if kokoro_caddy_needs_l4; then
-        [[ "$KOKORO_CADDY_L4_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+        digest="$(kokoro_caddy_l4_sha256 "${version}-${KOKORO_CADDY_L4_VERSION}" "$arch")" || return 1
         release="caddy-l4-${version}-${KOKORO_CADDY_L4_VERSION}"
         filename="caddy-linux-${arch}.tar.gz"
         url="https://github.com/takashi728/kokoro-xray/releases/download/${release}/${filename}"
-        digest="$(curl --proto '=https' -fsS --max-time 20 \
-            "https://api.github.com/repos/takashi728/kokoro-xray/releases/tags/${release}" |
-            jq -er --arg name "$filename" '.assets[] | select(.name == $name) | .digest')" || return 1
-        digest="${digest#sha256:}"
     else
         [[ "$version" == v2.11.9 ]] || return 1
         filename="caddy_${version#v}_linux_${arch}.tar.gz"

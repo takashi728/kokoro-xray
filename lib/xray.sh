@@ -17,8 +17,8 @@ kokoro_xray_install() {
     kokoro_need_root
     kokoro_xray_load_paths
     tmp="$(mktemp -d)"
-    zip="$(kokoro_xray_download_release_zip "$tmp")"
-    unzip -qo "${tmp}/${zip}" -d "$tmp"
+    zip="$(kokoro_xray_download_release_zip "$tmp")" && unzip -qo "${tmp}/${zip}" -d "$tmp" ||
+        { rm -rf -- "$tmp"; kokoro_die "failed to obtain verified Xray release"; }
     staged="${dest}.new.$$"
     install -m 755 "${tmp}/xray" "$staged"
     "$staged" version >/dev/null 2>&1 ||
