@@ -114,3 +114,20 @@ Regression coverage is in `tests/security.sh`, `tests/installer.sh`, and
 `tests/reload.sh`. The tests cover unit injection, execution before path
 validation, certificate-root escape, exact SAN matching, local-tree trust,
 immutable remote fetch, mismatch rollback, and installed-commit recording.
+
+## November 28, 2026 remediation
+
+| Finding | Commit | Change and verification |
+| --- | --- | --- |
+| CG-01 | `6fa46fa` | Pinned the amd64 and arm64 archives for Caddy `v2.11.9` with caddy-l4 `v0.1.3`. Both archive hashes were checked against downloaded release assets. Regression tests reject unknown pins before download and reject a checksum mismatch before extraction. |
+| CG-02 | `18f72e6` | Preflight and direct Caddy rendering validate domain names, XHTTP paths and ACME email fields. Tests exercise both entry points. Apply installs separate `kokoro-caddy` and `kokoro-xray` service accounts with `NoNewPrivileges` and `CAP_NET_BIND_SERVICE`. |
+| CG-03 | `1224dbe` | New XHTTP paths use 12 random bytes from OpenSSL. Tests check the 24-character token, repeated generation, and failure propagation. |
+| CG-04 | `f5cdd84` | UFW validates the complete rule list and installs the SSH allowance before changing default policies. Mocked UFW tests check port bounds, malformed entries, and the command sequence after each possible UFW failure. |
+| CG-05 | `0413cb9` | Secret updates, managed config rendering, and snapshot save/restore publish via same-directory temporary files. Tests under umask `0022` check mode `0600`, retention of the previous file on failure, and temporary-file cleanup. |
+| CG-06 | `5b0dfbe` | Tests cover the Caddy staging trap under `bash -u`, top-level `json` keys in both stores, and HTTPS-only pairing address discovery with validated IPv4 fallback. |
+
+The earlier root-only certificate ownership rule now also accepts the dedicated Caddy account. Apply migrates the existing managed certificate store. Caddy receives its root-owned configuration on standard input. At each Xray start, a privileged setup helper reads the root-owned Xray configuration and opens the referenced PEM files as `kokoro-caddy`. It stages the assembled config under `/run/kokoro-xray-input` with a root-owned directory and read access for the Xray group. Xray can use the renewed keys without traversal rights to Caddy's store.
+
+All 25 non-live shell test scripts passed, along with individual Bash syntax checks and `git diff --check`. An isolated UID test used the actual Caddy and Xray binaries to verify config readability, migration of an existing private key, isolation between service accounts, and refresh after certificate replacement. The RAW integration test passed in an isolated network namespace with the pinned PrivateBin image, including HTTP/1.1, HTTP/2, encrypted paste creation and retrieval, and both Vision transports.
+
+The external Hysteria2 port-hopping test requires an exported client profile and the expected public egress IPv4 address. Those inputs were unavailable. Hysteria2 rendering, hop-rule generation, and certificate watcher tests passed locally. Production systemd activation and public ACME issuance were outside this repository test run.
