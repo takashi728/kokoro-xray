@@ -5,30 +5,33 @@ source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_snapshot_save() {
     local xray_cfg caddyfile
-    kokoro_validate_service_paths
-    xray_cfg="$(kokoro_cfg '.paths.xray_config')"
-    caddyfile="$(kokoro_cfg '.paths.caddyfile')"
-    install -d -m 700 "${KOKORO_LAST_GOOD}"
-    [[ -f "$xray_cfg" ]] && cp "$xray_cfg" "${KOKORO_LAST_GOOD}/config.json"
-    [[ -f "$caddyfile" ]] && cp "$caddyfile" "${KOKORO_LAST_GOOD}/Caddyfile"
+    kokoro_validate_service_paths || return 1
+    xray_cfg="$(kokoro_cfg '.paths.xray_config')" || return 1
+    caddyfile="$(kokoro_cfg '.paths.caddyfile')" || return 1
+    install -d -m 700 "${KOKORO_LAST_GOOD}" || return 1
+    if [[ -f "$xray_cfg" ]]; then
+        kokoro_write_private "${KOKORO_LAST_GOOD}/config.json" cat -- "$xray_cfg" || return 1
+    fi
+    if [[ -f "$caddyfile" ]]; then
+        kokoro_write_private "${KOKORO_LAST_GOOD}/Caddyfile" cat -- "$caddyfile" || return 1
+    fi
 }
 
 kokoro_snapshot_restore() {
     local xray_cfg caddyfile
-    kokoro_validate_service_paths
-    xray_cfg="$(kokoro_cfg '.paths.xray_config')"
-    caddyfile="$(kokoro_cfg '.paths.caddyfile')"
+    kokoro_validate_service_paths || return 1
+    xray_cfg="$(kokoro_cfg '.paths.xray_config')" || return 1
+    caddyfile="$(kokoro_cfg '.paths.caddyfile')" || return 1
     if [[ -f "${KOKORO_LAST_GOOD}/config.json" ]]; then
-        install -d "$(dirname "$xray_cfg")"
-        cp "${KOKORO_LAST_GOOD}/config.json" "$xray_cfg"
-        chmod 600 "$xray_cfg"
+        install -d "$(dirname "$xray_cfg")" || return 1
+        kokoro_write_private "$xray_cfg" cat -- "${KOKORO_LAST_GOOD}/config.json" || return 1
     fi
     if [[ -f "${KOKORO_LAST_GOOD}/Caddyfile" ]]; then
-        cp "${KOKORO_LAST_GOOD}/Caddyfile" "$caddyfile"
+        kokoro_write_private "$caddyfile" cat -- "${KOKORO_LAST_GOOD}/Caddyfile" || return 1
     fi
 }
 
 kokoro_snapshot_exists() {
-    kokoro_validate_service_paths
+    kokoro_validate_service_paths || return 1
     [[ -f "${KOKORO_LAST_GOOD}/config.json" ]]
 }

@@ -73,38 +73,37 @@ kokoro_sec() {
     fi
 }
 
+kokoro_write_private() (
+    local destination="$1" staged cleanup
+    shift
+    staged="$(mktemp -- "${destination}.XXXXXX")" || return 1
+    printf -v cleanup 'rm -f -- %q' "$staged"
+    trap "$cleanup" EXIT
+    trap 'exit 1' HUP INT TERM
+    chmod 600 -- "$staged" || return 1
+    "$@" >"$staged" || return 1
+    mv -fT -- "$staged" "$destination" || return 1
+    trap - EXIT
+)
+
 kokoro_cfg_set() {
-    local tmp
-    tmp="$(mktemp)"
-    jq "$1 = $2" "${KOKORO_CONFIG}" >"$tmp"
-    mv "$tmp" "${KOKORO_CONFIG}"
-    chmod 644 "${KOKORO_CONFIG}"
+    kokoro_write_private "$KOKORO_CONFIG" jq "$1 = $2" "$KOKORO_CONFIG" || return 1
+    chmod 644 "$KOKORO_CONFIG" || return 1
     kokoro_state_refresh_cfg
 }
 
 kokoro_cfg_set_str() {
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg v "$2" "$1 = \$v" "${KOKORO_CONFIG}" >"$tmp"
-    mv "$tmp" "${KOKORO_CONFIG}"
-    chmod 644 "${KOKORO_CONFIG}"
+    kokoro_write_private "$KOKORO_CONFIG" jq --arg v "$2" "$1 = \$v" "$KOKORO_CONFIG" || return 1
+    chmod 644 "$KOKORO_CONFIG" || return 1
     kokoro_state_refresh_cfg
 }
 
 kokoro_sec_set_str() {
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg v "$2" "$1 = \$v" "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
+    kokoro_write_private "$KOKORO_SECRETS" jq --arg v "$2" "$1 = \$v" "$KOKORO_SECRETS" || return 1
     kokoro_state_refresh_sec
 }
 
 kokoro_sec_set() {
-    local tmp
-    tmp="$(mktemp)"
-    jq "$1 = $2" "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
+    kokoro_write_private "$KOKORO_SECRETS" jq "$1 = $2" "$KOKORO_SECRETS" || return 1
     kokoro_state_refresh_sec
 }

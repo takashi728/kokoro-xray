@@ -4,35 +4,24 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_render_xray() {
-    local out tmp
-    kokoro_validate_service_paths
-    out="$(kokoro_cfg '.paths.xray_config')"
+    local out
+    kokoro_validate_service_paths || return 1
+    out="$(kokoro_cfg '.paths.xray_config')" || return 1
     install -d "$(dirname "$out")" || return 1
-    tmp="$(mktemp "${out}.XXXXXX")" || return 1
-    if ! jq -n -f "${KOKORO_ROOT}/lib/render.jq" \
+    kokoro_write_private "$out" jq -n -f "${KOKORO_ROOT}/lib/render.jq" \
         --slurpfile cfg "${KOKORO_CONFIG}" \
-        --slurpfile sec "${KOKORO_SECRETS}" \
-        >"$tmp" || ! mv -- "$tmp" "$out"; then
-        rm -f -- "$tmp"
-        return 1
-    fi
+        --slurpfile sec "${KOKORO_SECRETS}"
 }
 
 kokoro_render_caddy() {
-    local out staged
+    local out
     kokoro_caddy_required || return 0
-    kokoro_validate_service_paths
-    out="$(kokoro_cfg '.paths.caddyfile')"
+    kokoro_validate_service_paths || return 1
+    out="$(kokoro_cfg '.paths.caddyfile')" || return 1
     install -d "$(dirname "$out")" || return 1
-    staged="$(mktemp "${out}.XXXXXX")" || return 1
-    if ! jq -n -r -f "${KOKORO_ROOT}/lib/caddy.jq" \
+    kokoro_write_private "$out" jq -n -r -f "${KOKORO_ROOT}/lib/caddy.jq" \
         --slurpfile cfg "${KOKORO_CONFIG}" \
-        --slurpfile sec "${KOKORO_SECRETS}" \
-        >"$staged"; then
-        rm -f "$staged"
-        return 1
-    fi
-    mv "$staged" "$out" || { rm -f "$staged"; return 1; }
+        --slurpfile sec "${KOKORO_SECRETS}"
 }
 
 kokoro_render() {

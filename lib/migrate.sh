@@ -74,17 +74,12 @@ kokoro_migrate_merge_defaults() {
     mv "$tmp" "${KOKORO_CONFIG}"
     chmod 644 "${KOKORO_CONFIG}"
 
-    tmp="$(mktemp)"
-    jq -s '.[0] * .[1]' \
+    kokoro_write_private "$KOKORO_SECRETS" jq -s '.[0] * .[1]' \
         "${KOKORO_ROOT}/secrets.defaults.json" \
-        "${KOKORO_SECRETS}" >"$tmp"
-    mv "$tmp" "${KOKORO_SECRETS}"
-    chmod 600 "${KOKORO_SECRETS}"
+        "${KOKORO_SECRETS}" || kokoro_die "cannot migrate secrets"
 }
 
 kokoro_migrate_v010_to_v020() {
-    local tmp
-    tmp="$(mktemp)"
 
     # Move secrets from config.json → secrets.json
     if jq -e '.inbound.uuid // empty' "${KOKORO_CONFIG}" >/dev/null 2>&1; then
@@ -98,7 +93,7 @@ kokoro_migrate_v010_to_v020() {
         edge_pub="$(jq -r '.multinode.local_pubkey // ""' "${KOKORO_CONFIG}")"
         exit_pub="$(jq -r '.multinode.exit_pubkey // ""' "${KOKORO_CONFIG}")"
 
-        jq \
+        kokoro_write_private "$KOKORO_SECRETS" jq \
             --arg uuid "$uuid" --arg path "$path" \
             --arg priv "$priv" --arg pub "$pub" --arg sid "$sid" \
             --arg epriv "$edge_priv" --arg epub "$edge_pub" \
@@ -109,15 +104,13 @@ kokoro_migrate_v010_to_v020() {
              | .inbound.reality.short_ids = [$sid]
              | .multinode.edge_wg_privkey = $epriv
              | .multinode.edge_wg_pubkey = $epub' \
-            "${KOKORO_SECRETS}" >"$tmp"
-        mv "$tmp" "${KOKORO_SECRETS}"
-        chmod 600 "${KOKORO_SECRETS}"
+            "${KOKORO_SECRETS}" || kokoro_die "cannot migrate legacy keys"
 
         if [[ -n "$exit_pub" ]]; then
             kokoro_cfg_set_str '.multinode.peer_exit_pubkey' "$exit_pub"
         fi
 
-        jq 'del(.inbound.uuid, .inbound.xhttp_path)
+        kokoro_write_private "$KOKORO_CONFIG" jq 'del(.inbound.uuid, .inbound.xhttp_path)
             | .inbound.reality |= del(.private_key, .public_key, .short_ids)
             | .multinode |= del(.local_privkey, .local_pubkey, .exit_pubkey)
             | .multinode.peer_exit_pubkey //= ""
@@ -127,8 +120,7 @@ kokoro_migrate_v010_to_v020() {
             | .paths.caddy_bin = "/usr/local/bin/caddy"
             | .paths.geo_dir = "/usr/local/share/xray"
             | .inbound.tls.acme_email //= ""' \
-            "${KOKORO_CONFIG}" >"$tmp"
-        mv "$tmp" "${KOKORO_CONFIG}"
+            "${KOKORO_CONFIG}" || kokoro_die "cannot migrate legacy configuration"
         chmod 644 "${KOKORO_CONFIG}"
     fi
 }
