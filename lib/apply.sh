@@ -9,6 +9,8 @@ source "${KOKORO_ROOT}/lib/render.sh"
 source "${KOKORO_ROOT}/lib/validate.sh"
 source "${KOKORO_ROOT}/lib/reload.sh"
 source "${KOKORO_ROOT}/lib/firewall.sh"
+source "${KOKORO_ROOT}/lib/caddy.sh"
+source "${KOKORO_ROOT}/lib/xray.sh"
 
 kokoro_apply() {
     kokoro_need_root
@@ -18,7 +20,11 @@ kokoro_apply() {
     kokoro_ensure_hysteria_secrets
 
     kokoro_preflight
-    kokoro_snapshot_save
+    kokoro_xray_install_service || kokoro_die "cannot prepare Xray unit"
+    if [[ "$(kokoro_cfg '.role')" == edge ]] && kokoro_caddy_required; then
+        kokoro_caddy_install_service || kokoro_die "cannot prepare Caddy unit"
+    fi
+    kokoro_snapshot_save || kokoro_die "cannot save rollback configuration"
 
     if ! kokoro_render; then
         kokoro_snapshot_restore

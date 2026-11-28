@@ -319,29 +319,19 @@ kokoro_caddy_build() {
 }
 
 kokoro_caddy_install_service() {
-    local caddy_bin caddyfile unit
+    local caddyfile unit
     kokoro_validate_service_paths
-    caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
-    install -d "$(dirname "$caddyfile")"
-    unit="[Unit]
-Description=Caddy Service (kokoro-xray)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=notify
-Environment=HOME=/var/lib/kokoro-caddy
-ExecStart=${caddy_bin} run --environ --config ${caddyfile}
-ExecReload=${caddy_bin} reload --config ${caddyfile} --force
-TimeoutStopSec=5s
-LimitNOFILE=1048576
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target"
+    install -d "$(dirname "$caddyfile")" || return 1
+    kokoro_service_user kokoro-caddy
+    if [[ ! -d /var/lib/kokoro-caddy || "$(stat -c %u /var/lib/kokoro-caddy)" == 0 ]]; then
+        printf '%s\n' 'd /var/lib/kokoro-caddy 0700 kokoro-caddy kokoro-caddy -' \
+            'Z /var/lib/kokoro-caddy - kokoro-caddy kokoro-caddy -' |
+            systemd-tmpfiles --create - || kokoro_die "cannot migrate Caddy storage"
+    fi
+    unit="$(kokoro_caddy_unit_content)" || return 1
     kokoro_install_systemd_unit caddy.service "$unit"
-    systemctl daemon-reload
+    systemctl daemon-reload || kokoro_die "cannot reload Caddy unit"
     systemctl enable caddy >/dev/null 2>&1 || true
 }
 
@@ -358,9 +348,17 @@ Wants=network-online.target
 
 [Service]
 Type=notify
+User=kokoro-caddy
+Group=kokoro-caddy
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+StateDirectory=kokoro-caddy
+StateDirectoryMode=0700
 Environment=HOME=/var/lib/kokoro-caddy
-ExecStart=${caddy_bin} run --environ --config ${caddyfile}
-ExecReload=${caddy_bin} reload --config ${caddyfile} --force
+StandardInput=file:${caddyfile}
+ExecStart=${caddy_bin} run --adapter caddyfile --config -
+ExecReload=${caddy_bin} reload --adapter caddyfile --config - --force
 TimeoutStopSec=5s
 LimitNOFILE=1048576
 Restart=on-failure
@@ -402,11 +400,11 @@ kokoro_caddy_prepare_certificate() { # domain, certificate state prefix
     caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
     cert_root="$(realpath -m -- "$(kokoro_hysteria_cert_root)")"
-    install -d -m 700 /var/lib/kokoro-caddy
     backup="$(mktemp -d)"
     [[ ! -f "$caddyfile" ]] || cp "$caddyfile" "$backup/Caddyfile"
     if systemctl is-active --quiet caddy 2>/dev/null; then caddy_active=true; fi
-    if ! kokoro_render_caddy || ! "$caddy_bin" validate --config "$caddyfile"; then
+    if ! kokoro_render_caddy || ! kokoro_service_validate kokoro-caddy "$caddyfile" \
+        env HOME=/var/lib/kokoro-caddy "$caddy_bin" validate --adapter caddyfile --config -; then
         kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" false "$caddyfile"
         kokoro_die "invalid Caddy config for Xray certificate"
     fi
@@ -429,19 +427,27 @@ kokoro_caddy_prepare_certificate() { # domain, certificate state prefix
     for i in $(seq 1 90); do
         cert="$(find "$cert_root" -type f -name "${domain}.crt" -print -quit 2>/dev/null)"
         key="$(find "$cert_root" -type f -name "${domain}.key" -print -quit 2>/dev/null)"
-        if [[ -n "$cert" && -n "$key" ]] && openssl x509 -checkend 3600 -noout -in "$cert" >/dev/null 2>&1; then
+        if [[ -n "$cert" && -n "$key" ]]; then
             canonical_cert="$(realpath -e -- "$cert")"
             canonical_key="$(realpath -e -- "$key")"
             [[ "$canonical_cert" == "${cert_root}/"* && "$canonical_key" == "${cert_root}/"* ]] ||
                 continue
-            [[ "$(stat -c '%u' "$canonical_cert")" == "0" &&
-               "$(stat -c '%u' "$canonical_key")" == "0" ]] ||
-                continue
+            local owner caddy_uid
+            caddy_uid="$(id -u kokoro-caddy 2>/dev/null || true)"
+            for owner in "$canonical_cert" "$canonical_key"; do
+                owner="$(stat -c %u "$owner")" || continue 2
+                [[ "$owner" == 0 || "$owner" == "$caddy_uid" ]] || continue 2
+            done
             cert_mode="$(stat -c '%a' "$canonical_cert")"
             key_mode="$(stat -c '%a' "$canonical_key")"
             (( (8#${cert_mode} & 8#022) == 0 &&
                (8#${key_mode} & 8#022) == 0 )) ||
                 continue
+            if (( EUID == 0 )); then
+                runuser -u kokoro-caddy -- openssl x509 -checkend 3600 -noout -in "$canonical_cert" >/dev/null 2>&1 || continue
+            else
+                openssl x509 -checkend 3600 -noout -in "$canonical_cert" >/dev/null 2>&1 || continue
+            fi
             kokoro_caddy_restore_after_certificate "$backup" "$caddy_active" "$stopped_xray" "$caddyfile"
             kokoro_cfg_set_str ".paths.${state_prefix}_cert" "$canonical_cert"
             kokoro_cfg_set_str ".paths.${state_prefix}_key" "$canonical_key"

@@ -32,6 +32,23 @@ export KOKORO_ROOT
 
 source "${KOKORO_ROOT}/lib/state.sh"
 
+kokoro_service_user() {
+    local account="$1"
+    printf 'u %s - "kokoro-xray service" /nonexistent\n' "$account" |
+        systemd-sysusers - || kokoro_die "cannot provision $account"
+    [[ "$(id -u "$account")" =~ ^[1-9][0-9]*$ ]] || kokoro_die "invalid $account uid"
+}
+
+kokoro_service_validate() {
+    local account="$1" config="$2"
+    shift 2
+    if (( EUID == 0 )); then
+        runuser -u "$account" -- "$@" <"$config"
+    else
+        "$@" <"$config"
+    fi
+}
+
 kokoro_path_is_systemd_safe() { # path
     local path="$1"
     [[ -n "$path" && "$path" != "null" ]] || return 1
@@ -106,13 +123,15 @@ kokoro_require_hysteria_file() { # config-key suffix; shared by HY2 and RAW TLS
             kokoro_die "managed certificate root is not a directory: ${root}"
         root_uid="$(stat -c '%u' "$root")"
         root_mode="$(stat -c '%a' "$root")"
-        [[ "$root_uid" == "0" ]] ||
-            kokoro_die "managed certificate root must be owned by root: ${root}"
+        local caddy_uid
+        caddy_uid="$(id -u kokoro-caddy 2>/dev/null || true)"
+        [[ "$root_uid" == 0 || "$root_uid" == "$caddy_uid" ]] ||
+            kokoro_die "unexpected owner of managed certificate root"
         (( (8#${root_mode} & 8#022) == 0 )) ||
             kokoro_die "managed certificate root must not be group/world writable: ${root}"
         uid="$(stat -c '%u' "$canonical")"
         mode="$(stat -c '%a' "$canonical")"
-        [[ "$uid" == "0" ]] || kokoro_die "${key} must be owned by root: ${path}"
+        [[ "$uid" == 0 || "$uid" == "$caddy_uid" ]] || kokoro_die "unexpected ${key} owner"
         (( (8#${mode} & 8#022) == 0 )) ||
             kokoro_die "${key} must not be group/world writable: ${path}"
     fi
@@ -167,7 +186,8 @@ kokoro_install_systemd_unit() { # name content
         rm -rf "$tmp"
         kokoro_die "generated systemd unit failed verification: ${name}"
     fi
-    install -m 644 "${tmp}/${name}" "${unit_dir}/${name}"
+    install -m 644 "${tmp}/${name}" "${unit_dir}/${name}" ||
+        { rm -rf -- "$tmp"; kokoro_die "cannot install ${name}"; }
     rm -rf "$tmp"
 }
 

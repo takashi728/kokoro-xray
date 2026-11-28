@@ -45,18 +45,19 @@ kokoro_xray_install_service() {
     kokoro_validate_service_paths
     cfg="$(kokoro_cfg '.paths.xray_config')"
     install -d "$(dirname "$cfg")"
+    kokoro_service_user kokoro-xray
+    install -D -m 0755 "${KOKORO_ROOT}/lib/xray-input.sh" /usr/local/libexec/kokoro-xray-input ||
+        kokoro_die "cannot install Xray input helper"
     unit="$(kokoro_xray_unit_content)"
     kokoro_install_systemd_unit xray.service "$unit"
-    systemctl daemon-reload
+    systemctl daemon-reload || kokoro_die "cannot reload Xray unit"
     systemctl enable xray >/dev/null 2>&1 || true
 }
 
 kokoro_xray_unit_content() {
-    local bin cfg line
+    local bin
     bin="$(kokoro_cfg '.paths.xray_bin')"
-    cfg="$(kokoro_cfg '.paths.xray_config')"
     kokoro_validate_service_paths
-    line="ExecStart=${bin} run -config ${cfg}"
     cat <<EOF
 [Unit]
 Description=Xray Service (kokoro-xray)
@@ -64,7 +65,13 @@ After=network.target
 
 [Service]
 Type=simple
-${line}
+User=kokoro-xray
+Group=kokoro-xray
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ExecStartPre=+/usr/local/libexec/kokoro-xray-input --stage
+ExecStart=${bin} run -config /run/kokoro-xray-input/config.json
 Restart=on-failure
 LimitNOFILE=65535
 

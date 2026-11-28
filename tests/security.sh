@@ -140,4 +140,62 @@ if cert_match www.example.com "\.example.com"; then
     exit 1
 fi
 
+jq '.role = "edge" | .inbound.tls.cdn_domain = "edge.example.com"
+    | .inbound.vless_encryption.enabled = false' "$ROOT/config.defaults.json" >"$TMP/valid-cfg"
+cp "$ROOT/.github/fixtures/edge-secrets.json" "$TMP/valid-sec"
+caddy_fixture() {
+    jq -nr -f "$ROOT/lib/caddy.jq" --slurpfile cfg "$state/config.json" \
+        --slurpfile sec "$state/secrets.json" >/dev/null
+}
+cp "$TMP/valid-cfg" "$state/config.json"
+cp "$TMP/valid-sec" "$state/secrets.json"
+caddy_fixture
+source_common kokoro_preflight
+for field in '.inbound.reality.server_names[1]' '.inbound.tls.cdn_domain' \
+             '.inbound.xhttp_path' '.inbound.tls.acme_email' '.inbound.hysteria.acme_email'; do
+    for invalid in $'valid.example\n' 'bad value' 'bad{value}'; do
+        cp "$TMP/valid-cfg" "$state/config.json"
+        cp "$TMP/valid-sec" "$state/secrets.json"
+        if [[ "$field" == .inbound.xhttp_path ]]; then file=secrets; else file=config; fi
+        jq --arg value "$invalid" "$field = \$value" "$state/$file.json" >"$TMP/mutated"
+        cat "$TMP/mutated" >"$state/$file.json"
+        if caddy_fixture 2>/dev/null || source_common kokoro_preflight >/dev/null 2>&1; then
+            echo "accepted malformed $field" >&2
+            exit 1
+        fi
+    done
+done
+
+cp "$TMP/valid-cfg" "$state/config.json"
+source_common kokoro_xray_unit_content >"$units/xray.service"
+HOME="$TMP" bash -c 'source "$1/lib/caddy.sh"; kokoro_caddy_unit_content' _ "$ROOT" >"$units/caddy.service"
+for service in xray caddy; do
+    unit="$units/$service.service"
+    grep -Fxq "User=kokoro-$service" "$unit"
+    grep -Fxq 'NoNewPrivileges=true' "$unit"
+    grep -Fxq 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE' "$unit"
+    grep -Fxq 'AmbientCapabilities=CAP_NET_BIND_SERVICE' "$unit"
+    sed -i -E 's@/usr/local/(libexec/kokoro-xray-input|bin/(caddy|xray))@/usr/bin/true@g' "$unit"
+    source_common kokoro_verify_systemd_unit "$unit"
+done
+grep -Fxq 'StandardInput=file:/etc/caddy/Caddyfile' "$units/caddy.service"
+
+(
+    source "$ROOT/lib/xray-input.sh"
+    cert="$cert_root/issuer/example.com/example.com.crt"
+    key="$cert_root/issuer/example.com/example.com.key"
+    jq -n --arg cert "$cert" --arg key "$key" '{
+        inbounds:[{protocol:"http", port:18242, streamSettings:{security:"tls",
+            tlsSettings:{certificates:[{certificateFile:$cert,keyFile:$key}]}}}],
+        outbounds:[{protocol:"freedom"}]}' >"$TMP/xray-input.json"
+    prepare_input "$TMP/xray-input.json" "$cert_root" >"$TMP/prepared.json"
+    jq -e '.inbounds[0].streamSettings.tlsSettings.certificates[0] |
+        (.certificate[0] == "-----BEGIN CERTIFICATE-----") and
+        (.key[0] | startswith("-----BEGIN ")) and (has("keyFile") | not)' "$TMP/prepared.json" >/dev/null
+    if command -v xray >/dev/null; then xray run -test -config "$TMP/prepared.json" >/dev/null; fi
+    jq --arg path "$TMP/escaped.crt" \
+        '.inbounds[0].streamSettings.tlsSettings.certificates[0].certificateFile=$path' \
+        "$TMP/xray-input.json" >"$TMP/invalid.json"
+    if (prepare_input "$TMP/invalid.json" "$cert_root") >/dev/null 2>&1; then exit 1; fi
+)
 echo "security-test OK"

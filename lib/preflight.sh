@@ -40,6 +40,9 @@ kokoro_preflight_edge() {
         *) kokoro_die "invalid inbound.mode: $mode" ;;
     esac
 
+    jq -nr -f "${KOKORO_ROOT}/lib/caddy.jq" \
+        --slurpfile cfg "$KOKORO_CONFIG" --slurpfile sec "$KOKORO_SECRETS" >/dev/null ||
+        kokoro_die "invalid Caddy configuration inputs"
     [[ -n "$(kokoro_sec '.inbound.uuid')" ]] || kokoro_die "missing inbound.uuid in secrets.json"
     [[ "$transport" == raw || -n "$(kokoro_sec '.inbound.xhttp_path')" ]] || kokoro_die "missing inbound.xhttp_path in secrets.json"
     if [[ "$(kokoro_cfg '.inbound.vless_encryption.enabled // false')" == "true" ]]; then
@@ -56,12 +59,13 @@ kokoro_preflight_edge() {
 
     if [[ "$mode" == "tls" || "$mode" == "both" ]]; then
         cdn="$(kokoro_tls_domain)"
+        cdn="${cdn,,}"
         [[ -n "$cdn" && "$cdn" != "null" ]] || kokoro_die "TLS domain required (inbound.tls.domain for RAW; inbound.tls.cdn_domain for XHTTP)"
         if [[ "$transport" == raw ]]; then
             [[ "$cdn" =~ ^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$ ]] ||
                 kokoro_die "RAW TLS requires a valid direct domain"
             [[ "$(kokoro_cfg '.caddy.use_l4')" == true ]] || kokoro_die "RAW TLS requires caddy.use_l4=true"
-            if [[ "$mode" == both ]] && kokoro_cfg '.inbound.reality.server_names' | jq -e --arg domain "$cdn" 'index($domain) != null' >/dev/null; then
+            if [[ "$mode" == both ]] && kokoro_cfg '.inbound.reality.server_names' | jq -e --arg domain "$cdn" 'map(ascii_downcase) | index($domain) != null' >/dev/null; then
                 kokoro_die "RAW TLS domain must differ from the REALITY SNI in both mode"
             fi
             kokoro_require_hysteria_file '.paths.tls_cert' '.crt'

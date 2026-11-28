@@ -26,14 +26,23 @@ kokoro_validate() {
     [[ -x "$xray_bin" ]] || { kokoro_warn "xray binary not found: $xray_bin"; return 1; }
 
     kokoro_validate_geo || return 1
-    "$xray_bin" run -test -config "$cfg" || { kokoro_warn "xray config test failed"; return 1; }
+    if (( EUID == 0 )); then
+        (set -o pipefail
+         /usr/local/libexec/kokoro-xray-input --stdout |
+             runuser -u kokoro-xray -- "$xray_bin" run -test -format json -config stdin:) ||
+            { kokoro_warn "xray config test failed"; return 1; }
+    else
+        "$xray_bin" run -test -config "$cfg" || { kokoro_warn "xray config test failed"; return 1; }
+    fi
 
     if [[ "$role" == "edge" ]] && kokoro_caddy_required; then
         local caddy_bin
         caddy_bin="$(kokoro_cfg '.paths.caddy_bin')"
         [[ -f "$caddyfile" ]] || { kokoro_warn "missing caddy config: $caddyfile"; return 1; }
         [[ -x "$caddy_bin" ]] || { kokoro_warn "caddy binary not found: $caddy_bin"; return 1; }
-        "$caddy_bin" validate --config "$caddyfile" || { kokoro_warn "caddy validate failed"; return 1; }
+        kokoro_service_validate kokoro-caddy "$caddyfile" env HOME=/var/lib/kokoro-caddy \
+            "$caddy_bin" validate --adapter caddyfile --config - ||
+            { kokoro_warn "caddy validate failed"; return 1; }
     fi
 
     kokoro_log "validation passed"
