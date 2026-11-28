@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+(
+    source "$(dirname "$0")/../../lib/keys.sh"
+    declare -A seen=()
+    for ((attempt=0; attempt<32; attempt++)); do
+        path="$(kokoro_rand_path)"
+        [[ "$path" =~ ^/[A-Za-z0-9_-]{24}$ && -z "${seen[$path]:-}" ]]
+        seen[$path]=1
+    done
+    [[ "$(declare -f kokoro_rand_path)" != *RANDOM* ]]
+    openssl() { return 1; }
+    if path="$(kokoro_rand_path)"; then exit 1; fi
+    [[ -z "$path" ]]
+)
+
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 tmp_home="$(mktemp -d)"
 state="${tmp_home}/.kokoro-xray"

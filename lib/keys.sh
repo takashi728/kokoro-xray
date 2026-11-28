@@ -4,13 +4,9 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 kokoro_rand_path() {
-    local chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    local out="/" i c
-    for i in $(seq 1 24); do
-        c="${chars:RANDOM%${#chars}:1}"
-        out+="$c"
-    done
-    printf '%s\n' "$out"
+    local token
+    token="$(openssl rand -hex 12)" || return 1
+    printf '/%s\n' "$token"
 }
 
 kokoro_rand_short_id() { openssl rand -hex 4; }
@@ -126,7 +122,7 @@ kokoro_gen_edge_secrets() {
     local uuid path sid
     kokoro_validate_service_paths
     uuid="$(kokoro_gen_uuid)"
-    path="$(kokoro_rand_path)"
+    path="$(kokoro_rand_path)" || return 1
     sid="$(kokoro_rand_short_id)"
     kokoro_sec_set_str '.inbound.uuid' "$uuid"
     kokoro_sec_set_str '.inbound.xhttp_path' "$path"
