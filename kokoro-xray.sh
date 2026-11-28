@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "$0")"
-export KOKORO_ROOT="$(cd -P -- "$(dirname -- "$SCRIPT_PATH")" && pwd -P)"
+KOKORO_ROOT="$(cd -P -- "$(dirname -- "$SCRIPT_PATH")" && pwd -P)"
+export KOKORO_ROOT
 source "${KOKORO_ROOT}/lib/common.sh"
 
 kokoro_ensure_state
@@ -35,7 +36,13 @@ kokoro_dispatch() {
     case "$cmd" in
         edge)    bash "${KOKORO_ROOT}/roles/edge.sh" "$@" ;;
         exit)    bash "${KOKORO_ROOT}/roles/exit.sh" "$@" ;;
-        link)    bash "${KOKORO_ROOT}/roles/client.sh" "$@" ;;
+        link)    exec bash "${KOKORO_ROOT}/roles/client.sh" "$@" ;;
+        warp|argo)
+            exec bash -eu -o pipefail -c '
+                source "$KOKORO_ROOT/lib/cloudflare.sh"
+                kokoro_state_refresh
+                kokoro_cf_run "$@"
+            ' kokoro-xray "$cmd" "$@" ;;
         firewall)
             source "${KOKORO_ROOT}/lib/firewall.sh"
             kokoro_firewall_cli "$@"
@@ -47,7 +54,7 @@ kokoro_dispatch() {
             ;;
         pair)    bash "${KOKORO_ROOT}/roles/pair.sh" ;;
         status)  source "${KOKORO_ROOT}/lib/health.sh"; kokoro_health ;;
-        validate) bash "${KOKORO_ROOT}/lib/validate.sh" ;;
+        validate) exec bash "${KOKORO_ROOT}/lib/validate.sh" ;;
         tor)
             case "${1:-}" in
                 on)  source "${KOKORO_ROOT}/lib/tor.sh"; kokoro_tor_enable ;;

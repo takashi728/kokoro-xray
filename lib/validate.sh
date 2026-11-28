@@ -2,6 +2,7 @@
 # kokoro-xray — config validation
 
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
+source "${KOKORO_ROOT}/lib/cloudflare.sh"
 
 kokoro_validate_geo() {
     local geo_dir
@@ -18,6 +19,7 @@ kokoro_validate() {
     local xray_bin cfg caddyfile role
     kokoro_validate_service_paths
     xray_bin="$(kokoro_cfg '.paths.xray_bin')"
+    kokoro_cf_validate || return 1
     cfg="$(kokoro_cfg '.paths.xray_config')"
     caddyfile="$(kokoro_cfg '.paths.caddyfile')"
     role="$(kokoro_cfg '.role')"
@@ -50,7 +52,8 @@ kokoro_validate() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    export KOKORO_ROOT="$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)"
+    KOKORO_ROOT="$(cd -P -- "$(dirname -- "$0")/.." && pwd -P)"
+    export KOKORO_ROOT
     kokoro_ensure_state
     kokoro_validate || exit 1
 fi

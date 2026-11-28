@@ -11,6 +11,12 @@ Method: source review, focused adversarial reproduction, shell syntax checks, an
 
 The audit verified two security findings. The highest impact issue is command injection into root-owned systemd service units through configuration-controlled executable and configuration paths. The bootstrap installer also installs and executes code from a mutable Git branch, leaving a supply-chain trust gap for a root installation. Existing checksum tests and the current shell/render test suite pass; those checks do not cover either finding.
 
+## Cloudflare integration controls
+
+The optional Argo inbound binds to IPv4 loopback and requires the node's VLESS Encryption keypair. The service uses a dynamic UID, a read-only system tree and a root-readable environment file. The token is excluded from the unit command line, status and client profiles. Quick-mode hostnames are read from the current systemd invocation. A new connector binary must match the architecture-specific digest for cloudflared 2026.11.2. `argo off` removes the unit and environment file. `argo uninstall` removes the token from managed secrets as well. Revoke an exposed token with Cloudflare.
+
+WARP accepts registered ECDSA P-256 keys in the private state file. Xray also needs the key in its protected rendered and staged server configuration and rollback snapshot. Client exports have no WARP credentials. The MASQUE outbound sets one ALPN, enforces an SPKI or certificate pin, and emits no ECH or insecure TLS option. Initial SPKI discovery without an independently trusted fingerprint is trust on first use. A changed SPKI requires explicit acceptance. Tests exercise render compatibility, both transports, input rejection, credential redaction and an encrypted local Argo-origin transfer. A real Cloudflare account and remote client are required to verify a deployment.
+
 ## Findings
 
 ### KX-001 — Root systemd unit command injection through mutable path settings

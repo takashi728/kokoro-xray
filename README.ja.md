@@ -10,6 +10,26 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 
 [English](README.md) | [日本語](README.ja.md)
 
+## Cloudflare Tunnel と WARP
+
+エッジの `argo` は VLESS Encryption を有効にした XHTTP をループバックで受けます。`warp` はエッジまたは出口の指定した通信を Xray の MASQUE で送ります。どちらも初期状態では無効で、個別に使用できます。
+
+```sh
+kokoro-xray argo setup --mode named --hostname tunnel.example.org --token-file /root/tunnel.token
+kokoro-xray argo status
+kokoro-xray link --json argo --cf-ip 198.51.100.10
+kokoro-xray warp setup --import-usque /root/usque.json --transport h3 --route-presets ai,streaming,google
+kokoro-xray warp test
+```
+
+ホスト名と接続先 IP は実際の値に置き換えてください。`--cf-ip` は接続先だけを変更し、SNI と Host は公開ホスト名を使います。Cloudflare 管理画面の接続先は `http://127.0.0.1:18080` です。cloudflared から Cloudflare までは既定で QUIC、ローカルの平文 HTTP 接続は HTTP/1.1 です。UDP が使えない場合は `--protocol http2` を選べます。トンネルには送信先ポート 7844 を許可してください。
+
+`argo setup --mode quick` は一時ホスト名を発行します。再起動後は `argo status` と `link --json argo` で更新してください。常用には名前付きトンネルを使用してください。`--tunnel-only` は公開リスナーと Hysteria2 を停止します。既存のファイアウォール許可は別途確認してください。`argo off` はサービスと環境ファイルを削除し、`argo uninstall` は保存済みトークンも消去します。
+
+WARP には登録済み P-256 鍵と割当アドレスが必要です。`--import-usque` の代わりに `--private-key-file` と `--addresses` を指定できます。`--public-key` または `--cert-pin` で接続先を固定してください。指定せず鍵を初回取得する場合は別経路で検証してください。`warp fetch-pubkey` は鍵が変わると停止します。Xray 26.11.9 の送信 MTU は 1280 固定です。
+
+既定の H3 は対象ドメインだけを WARP に送ります。`--transport h2` と `warp.finalmask.enabled` で TCP 断片化を使えます。`warp.custom_domains`、`warp.ipv4_via_warp` は `config.json` で設定して `kokoro-xray apply` を実行してください。`--route-mode all` では未一致の通信も対象になります。ペアリング済みエッジは既定経路に WireGuard 出口を使います。`warp on|off` で切り替え、`warp test --speed` は WARP と直接回線で各 20 MB を転送します。
+
 ## サポートモード
 
 - エッジ単一ノード: VLESS XHTTP REALITY、TLS、または両方
@@ -21,7 +41,7 @@ Xray のエッジ/エグジット構築用の小さなシェルマネージャ�
 
 - Debian または Ubuntu
 - ルート権限
-- エッジノードで `443/tcp` を開放
+- 公開リスナーを使うエッジでは `443/tcp` を開放
 - TLS エッジノードでは ACME のため `80/tcp` を開放
 - エッジ + エグジットを使う場合はエグジットノードの UDP ポートを開放 (デフォルト `51820/udp`)
 

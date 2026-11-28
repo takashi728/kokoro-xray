@@ -90,6 +90,7 @@ kokoro_firewall_validate_extra() {
     validated_rules="$(kokoro_firewall_rules)" || kokoro_die "invalid firewall configuration"
     if (( $# )); then
         local -n output_rules="$1"
+        # shellcheck disable=SC2034 # The caller receives this value through the nameref.
         output_rules="$validated_rules"
     fi
 }
@@ -120,6 +121,15 @@ kokoro_firewall_ufw_allow() {
 }
 
 kokoro_firewall_print_rule() {
+    if [[ $(kokoro_cfg '.argo.enabled // false') == true ]]; then
+        local port low high range="${1%/*}"
+        port="$(kokoro_cfg '.argo.local_port')"
+        low="${range%%:*}"; high="${range##*:}"
+        if [[ ! $port =~ ^[0-9]{1,5}$ ]] || (( 10#$port >= 10#$low && 10#$port <= 10#$high )); then
+            kokoro_warn "Argo loopback port collides with a firewall port"
+            return 1
+        fi
+    fi
     printf '%s %s\n' "$1" "$2"
 }
 
@@ -181,7 +191,16 @@ kokoro_firewall_apply_enabled() {
         kokoro_firewall_ufw_allow "$spec" "$comment" || return 1
     done <<<"$rules"
     ufw default deny incoming >/dev/null || kokoro_die "ufw default deny incoming failed"
-    ufw default allow outgoing >/dev/null || kokoro_die "ufw default allow outgoing failed"
+    if [[ $(kokoro_cfg '.warp.enabled // false') == true && $(kokoro_cfg '.warp.transport') == h3 ]] &&
+        LC_ALL=C ufw status verbose | grep -E 'Default:.*(deny|reject) \(outgoing\)' >/dev/null; then
+        source "$KOKORO_ROOT/lib/cloudflare.sh"
+        local endpoint port
+        endpoint="$(kokoro_cfg '.warp.endpoint')"; port="$(kokoro_cfg '.warp.port')"
+        kokoro_cf_ip "$endpoint" && [[ $port =~ ^(443|500|1701|4443|4500|8443|8095)$ ]] || kokoro_die "$(kokoro_cf_text warp_invalid)"
+        ufw allow out proto udp to "$endpoint" port "$port" comment kokoro-warp || return 1
+    else
+        ufw default allow outgoing >/dev/null || kokoro_die "ufw default allow outgoing failed"
+    fi
     ufw --force enable >/dev/null || kokoro_die "ufw enable failed"
     ufw reload >/dev/null || kokoro_die "ufw reload failed"
     kokoro_log "firewall: UFW active (ssh=${rules%%/*})"

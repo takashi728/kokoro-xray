@@ -15,11 +15,38 @@ The scripts keep state in JSON, render configs with `jq`, validate before reload
 - RAW TLS edge: Caddy passes TLS through to Xray; PrivateBin in Podman serves web fallback
 - REALITY edge: Xray serves public `:443` directly
 
+## Optional Cloudflare ingress and egress
+
+Use `argo` on an edge to accept encrypted VLESS/XHTTP through Cloudflare Tunnel. Use `warp` on an edge or exit to route selected destinations through native Xray MASQUE. Both are disabled on installation and can be enabled independently.
+
+```sh
+kokoro-xray argo setup --mode named --hostname tunnel.example.org --token-file /root/tunnel.token
+kokoro-xray argo status
+kokoro-xray link --json argo --cf-ip 198.51.100.10
+kokoro-xray warp setup --import-usque /root/usque.json --transport h3 --route-presets ai,streaming,google
+kokoro-xray warp status
+kokoro-xray warp test
+```
+
+Replace the example hostname and documentation IP with your tunnel hostname and an edge address that serves it. The preferred address changes the connection destination. SNI and the HTTP Host remain the tunnel hostname. `link` also prints a VLESS URI. `link --qr` includes Argo. Set `argo.preferred_ip` or pass `--preferred-ip` during setup to save a default.
+
+**Argo.** In the Cloudflare dashboard, publish the named hostname with HTTP service `http://127.0.0.1:18080`. Native VLESS Encryption must be enabled on the edge. The client uses TLS to the edge, cloudflared uses QUIC to Cloudflare by default, and Xray accepts cleartext XHTTP only on loopback. The pinned cloudflared HTTP origin uses HTTP/1.1. Enabling HTTP/2 origin requires a TLS origin. Use `--protocol http2` for a TCP connector or `--local-port` to change the origin port. Allow connector egress to Cloudflare on port 7844 for the chosen protocol.
+
+`argo setup --mode quick` obtains an ephemeral hostname. Wait for `argo status` to show it and regenerate the profile after a connector restart. Quick tunnels have Cloudflare service limits, including no SSE support. Use a named tunnel for a persistent deployment. `--tunnel-only` selects Argo as the sole Xray ingress and disables Hysteria2. On a fresh node, run it after the bootstrap installer. On an existing edge it replaces the public listener configuration. Existing UFW permits and external firewall policies may still need operator cleanup. `argo off` removes the service and its environment file. `argo on` reuses the saved token. `argo uninstall` also forgets the saved token. Reinstallation preserves managed state.
+
+**WARP.** Import an already registered MASQUE identity. Alternatively pass `--private-key-file` with a PEM or base64 DER P-256 key and `--addresses` with one or two comma-separated assigned IPs. Registration and a WireGuard account-key conversion are outside this command. `--account-type free|plus|zerotrust` and `--family 4|6` select an endpoint. Override with `--endpoint`, `--port`, or `--sni`. Xray 26.11.9 fixes the outbound tunnel MTU at 1280.
+
+Supply a trusted `--public-key` (PEM or base64 SPKI), import `endpoint_pub_key` from usque, or use `--cert-pin` with a SHA-256 leaf certificate fingerprint. Xray requires an SPKI field even in certificate-pin mode, so setup retrieves the peer SPKI over TCP when needed and checks a configured certificate fingerprint. Without a preconfigured pin or imported key this is trust on first use. Verify the key independently. `warp fetch-pubkey` refuses an unexpected rotation unless you explicitly pass `--accept-new-pin`.
+
+Selective routing uses the pinned geodata's AI, streaming and Google presets. Set `warp.custom_domains` in `~/.kokoro-xray/config.json` for additional Xray domain rules. `warp.ipv4_via_warp` sends eligible IPv4 destinations through WARP. Private destinations are blocked. Tor retains `.onion` on the exit. Explicit WARP domain matches precede the existing proxy rules. `--route-mode all` sends otherwise unmatched traffic through WARP, with a paired edge continuing to use its WireGuard exit by default. `--transport h2` supports TCP-only networks. Set `warp.finalmask.enabled` for TLS-hello fragmentation on H2. H3 noise additionally requires `warp.finalmask.h3_noise_enabled`. Run `kokoro-xray apply` after editing state.
+
+`warp on` and `warp off` retain the account for reuse. `warp test` sends Cloudflare's trace request through an isolated local Xray SOCKS listener and prints the WARP result, colo and total request time. `warp test --speed` also downloads 20 MB over each of WARP and direct egress. For live acceptance, check the trace and transfer data through the exported Argo client from a separate machine.
+
 ## Requirements
 
 - Debian or Ubuntu
 - Root access
-- `443/tcp` open on edge nodes
+- `443/tcp` open on edges serving a public listener
 - `80/tcp` open on TLS edge nodes for ACME
 - Hysteria2 UDP ports open when enabled, default `443,20000-20020/udp`
 - A direct, DNS-only domain for Hysteria2 certificate issuance

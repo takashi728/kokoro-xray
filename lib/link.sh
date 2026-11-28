@@ -3,6 +3,8 @@
 
 : "${KOKORO_ROOT:=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}"
 source "${KOKORO_ROOT}/lib/common.sh"
+source "${KOKORO_ROOT}/lib/cloudflare.sh"
+source "${KOKORO_ROOT}/lib/argo.sh"
 
 kokoro_link_vless_encryption() {
     if [[ "${1:-}" == tls ]] && kokoro_raw_tls_enabled; then
@@ -194,7 +196,8 @@ kokoro_link_vless_json() {
         --arg path "$path" \
         --arg uuid "$uuid" \
         --arg encryption "$encryption" \
-        --arg transport "$(kokoro_cfg '.inbound.transport // "xhttp"')" \
+        --arg transport "${10:-$(kokoro_cfg '.inbound.transport // "xhttp"')}" \
+        --arg argo_mode "${11:-auto}" \
         '
           def xhttp_base_settings:
             {
@@ -207,7 +210,9 @@ kokoro_link_vless_json() {
             };
 
           def xhttp_settings:
-            if $security == "tls" then
+            if $tag == "kokoro-argo" then
+              {path:$path, host:$server_name, mode:$argo_mode}
+            elif $security == "tls" then
               xhttp_base_settings + {
                 host: $server_name,
                 mode: "auto",
@@ -425,6 +430,28 @@ kokoro_link_reality_json() {
         "$public_key" "$short_id" "$path" "$uuid" "$encryption"
 }
 
+kokoro_link_argo() {
+    local format="$1" preferred="$2" hostname address path uuid encryption mode
+    [[ $(kokoro_cfg '.argo.enabled // false') == true ]] || return 1
+    kokoro_argo_validate || return 1
+    if ! hostname="$(kokoro_argo_hostname)" || ! kokoro_cf_domain "$hostname"; then
+        kokoro_warn "$(kokoro_cf_text argo_pending)"; return 1
+    fi
+    address="${preferred:-$(kokoro_cfg '.argo.preferred_ip')}"
+    address="${address:-$hostname}"
+    kokoro_cf_host "$address" || return 1
+    path="$(kokoro_cfg '.argo.xhttp_path')"; mode="$(kokoro_cfg '.argo.xhttp_mode')"
+    uuid="$(kokoro_sec '.inbound.uuid')"; encryption="$(kokoro_link_vless_encryption)"
+    if [[ $format == json ]]; then
+        kokoro_link_vless_json "$address" kokoro-argo tls "$hostname" "" "" "$path" "$uuid" "$encryption" xhttp "$mode"
+    else
+        [[ $address != *:* ]] || address="[$address]"
+        jq -nr --arg address "$address" --arg host "$hostname" --arg path "$path" --arg mode "$mode" \
+            --arg uuid "$uuid" --arg enc "$encryption" '
+            "vless://\($uuid|@uri)@\($address):443?security=tls&type=xhttp&alpn=h2&fp=chrome&encryption=\($enc|@uri)&sni=\($host)&host=\($host)&path=\($path|@uri)&mode=\($mode)#kokoro-argo"'
+    fi
+}
+
 kokoro_link_qr_ensure() {
     command -v qrencode >/dev/null 2>&1 && return 0
     if [[ "${EUID}" -eq 0 ]]; then
@@ -447,15 +474,18 @@ kokoro_link_qr() {
 
 kokoro_link_show() {
     local show_qr=false json_profile=""
-    local reality_url tls_url hysteria_url
+    local reality_url tls_url hysteria_url argo_url="" preferred=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --qr) show_qr=true; shift ;;
+            --cf-ip)
+                kokoro_cf_host "${2:-}" || kokoro_die "$(kokoro_cf_text argo_invalid)"
+                preferred="$2"; shift 2 ;;
             --json)
                 if [[ $# -ge 2 && "${2:-}" != -* ]]; then
-                    [[ "$2" == "tls" || "$2" == "reality" || "$2" == "hysteria" ]] ||
-                        kokoro_die "unknown JSON profile: $2 (expected tls, reality, or hysteria)"
+                    [[ "$2" =~ ^(tls|reality|hysteria|argo)$ ]] ||
+                        kokoro_die "unknown JSON profile: $2 (expected tls, reality, hysteria, or argo)"
                     json_profile="$2"
                     shift 2
                 else
@@ -470,11 +500,11 @@ kokoro-xray link — proxy share URLs
 Usage:
   kokoro-xray link
   kokoro-xray link --qr
-  kokoro-xray link --json [tls|reality|hysteria]
+  kokoro-xray link --json [tls|reality|hysteria|argo] [--cf-ip ADDRESS]
 
 Options:
   --qr                    Print terminal QR codes (requires qrencode)
-  --json [tls|reality|hysteria]
+  --json [tls|reality|hysteria|argo]
                           Print a full Xray client JSON profile
 EOF
                 return 0
@@ -484,6 +514,10 @@ EOF
     done
 
     case "$json_profile" in
+        argo)
+            kokoro_ensure_state
+            kokoro_link_argo json "$preferred" || kokoro_die "$(kokoro_cf_text argo_pending)"
+            return 0 ;;
         tls)
             kokoro_link_tls_json ||
                 kokoro_die "tls profile is unavailable for current mode"
@@ -504,8 +538,11 @@ EOF
     reality_url="$(kokoro_link_reality_url)"
     tls_url="$(kokoro_link_tls_url)"
     hysteria_url="$(kokoro_link_hysteria_url)"
+    if [[ $(kokoro_cfg '.argo.enabled // false') == true ]]; then
+        argo_url="$(kokoro_link_argo url "$preferred")" || argo_url=""
+    fi
 
-    [[ -n "$reality_url" || -n "$tls_url" || -n "$hysteria_url" ]] ||
+    [[ -n "$reality_url" || -n "$tls_url" || -n "$hysteria_url" || -n "$argo_url" ]] ||
         kokoro_die "no links for role/mode (edge required)"
 
     if [[ -n "$reality_url" ]]; then
@@ -521,5 +558,9 @@ EOF
     if [[ -n "$hysteria_url" ]]; then
         printf '%s\n' "$hysteria_url"
         [[ "$show_qr" == "true" ]] && kokoro_link_qr "$hysteria_url" "HYSTERIA2"
+    fi
+    if [[ -n $argo_url ]]; then
+        printf '%s\n' "$argo_url"
+        if [[ $show_qr == true ]]; then kokoro_link_qr "$argo_url" Argo; fi
     fi
 }

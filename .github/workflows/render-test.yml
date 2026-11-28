@@ -64,6 +64,10 @@ jobs:
         run: |
           XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/hysteria.sh
           bash tests/hysteria-hop.sh
+      - name: Test WARP and Argo with the pinned core and geodata
+        run: |
+          curl --proto '=https' --proto-redir '=https' -fsSL https://github.com/cloudflare/cloudflared/releases/download/2026.11.2/cloudflared-linux-amd64 -o /tmp/kokoro-xray-ci/cloudflared
+          CLOUDFLARED_BIN=/tmp/kokoro-xray-ci/cloudflared XRAY_BIN=/tmp/kokoro-xray-ci/xray bash tests/cloudflare.sh
       - name: Run RAW Vision tests
         run: |
           bash tests/raw-tls-domain.sh

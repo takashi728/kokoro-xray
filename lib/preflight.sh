@@ -4,6 +4,7 @@
 source "$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 source "${KOKORO_ROOT}/lib/firewall.sh"
 source "${KOKORO_ROOT}/lib/fallback.sh"
+source "${KOKORO_ROOT}/lib/cloudflare.sh"
 
 kokoro_preflight() {
     local role mode
@@ -11,6 +12,7 @@ kokoro_preflight() {
     mode="$(kokoro_cfg '.inbound.mode')"
 
     kokoro_preflight_paths
+    kokoro_cf_validate || kokoro_die "$(kokoro_cf_text cf_invalid)"
     [[ -n "$role" && "$role" != "null" ]] || kokoro_die "role not set (edge or exit)"
 
     case "$role" in
@@ -36,7 +38,7 @@ kokoro_preflight_edge() {
         *) kokoro_die "invalid inbound.transport: $transport (raw or xhttp)" ;;
     esac
     case "$mode" in
-        reality|tls|both) ;;
+        reality|tls|both|argo) ;;
         *) kokoro_die "invalid inbound.mode: $mode" ;;
     esac
 
@@ -93,7 +95,7 @@ kokoro_preflight_edge() {
 }
 
 kokoro_preflight_hysteria() {
-    local cdn="${1:-}" domain email ports interval masquerade cert key item from to
+    local cdn="${1:-}" domain email ports interval masquerade item from to
     local -a items
     domain="$(kokoro_cfg '.inbound.hysteria.domain' | tr '[:upper:]' '[:lower:]')"
     email="$(kokoro_cfg '.inbound.hysteria.acme_email')"

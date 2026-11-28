@@ -289,7 +289,64 @@ def exit_config: log_block + {
   policy: policy_block.policy
 };
 
-if role == "edge" then edge_config
+def argo_inbound: {
+  tag: "in-argo-xhttp", listen: "127.0.0.1", port: cfg.argo.local_port,
+  protocol: "vless",
+  settings: {clients: [{id: sec.inbound.uuid}], decryption: vless_decryption},
+  streamSettings: {network: "xhttp", security: "none",
+    xhttpSettings: {path: cfg.argo.xhttp_path, mode: cfg.argo.xhttp_mode}},
+  sniffing: {enabled: true, destOverride: ["http","tls","quic"], routeOnly: true}
+};
+
+def warp_outbound: cfg.warp as $w | {
+  tag: "warp-masque", protocol: "masque", settings: {address: $w.endpoint, port: $w.port},
+  streamSettings: ({
+    method: "masque", security: "tls",
+    masqueSettings: {warp: {privateKey: sec.warp.private_key, publicKey: $w.public_key, address: $w.addresses}},
+    tlsSettings: ({serverName: $w.sni, alpn: [$w.transport]} +
+      if $w.pinned_peer_cert_sha256 != "" then {pinnedPeerCertSha256: $w.pinned_peer_cert_sha256} else {} end)
+  } + if $w.finalmask.enabled and $w.transport == "h2" then {
+    finalmask: {tcp: [{type: "fragment", settings: {packets: "tlshello",
+      lengths: [$w.finalmask.h2_fragment_lengths], delays: [$w.finalmask.h2_fragment_delays]}}]}
+  } elif $w.finalmask.enabled and $w.finalmask.h3_noise_enabled then {
+    finalmask: {udp: [{type: "noise", settings: {noise: [{rand: "12-24"}]}}]}
+  } else {} end)
+};
+
+def warp_routing:
+  cfg.warp as $w |
+  {ai: ["geosite:openai","geosite:anthropic","geosite:google-gemini","geosite:perplexity"],
+   streaming: ["geosite:netflix","geosite:disney","geosite:hulu","geosite:spotify"],
+   google: ["geosite:google"]} as $sets |
+  ([$w.route_presets[] as $preset | $sets[$preset][]] + $w.custom_domains | unique) as $domains |
+  (if role == "edge" and cfg.multinode.enabled then "WG_TO_EXIT"
+   elif $w.route_mode == "all" then "warp-masque" else "DIRECT" end) as $default |
+  (if role == "exit" then .inbounds[0].sniffing = {
+    enabled:true, destOverride:["http","tls","quic"], routeOnly:true
+  } else . end) |
+  .outbounds += [warp_outbound] |
+  .outbounds |= (map(select(.tag == $default)) + map(select(.tag != $default))) |
+  .routing.rules = (
+    single_node_block_rules[:2] +
+    [{type:"field",ip:[$w.endpoint],outboundTag:"DIRECT"},
+     {type:"field",domain:(["full:" + $w.sni,"domain:argotunnel.com","domain:trycloudflare.com"] +
+       (if cfg.argo.enabled and cfg.argo.hostname != "" then ["full:" + cfg.argo.hostname] else [] end)),outboundTag:"DIRECT"}] +
+    (if role == "exit" then exit_tor_rules else [] end) +
+    (if ($domains|length)>0 then [{type:"field",domain:$domains,outboundTag:"warp-masque"}] else [] end) +
+    custom_proxy_rules +
+    (if role == "edge" and (cfg.multinode.enabled|not) then
+       (if $w.route_mode == "all" then [] else google_direct_rules end) + single_node_block_rules[2:]
+     else [] end) +
+    (if $w.ipv4_via_warp then [{type:"field",ip:["0.0.0.0/0"],outboundTag:"warp-masque"}] else [] end)
+  );
+
+(if role == "edge" then edge_config
 elif role == "exit" then exit_config
 else error("unknown role: \(role)")
-end
+end)
+| if cfg.argo.enabled == true then
+    if role != "edge" or (cfg.inbound.vless_encryption.enabled != true) or
+       ([vless_decryption,sec.inbound.vless_encryption.encryption] | any(. == null or . == "" or . == "none"))
+    then error("Argo requires edge VLESS Encryption") else .inbounds += [argo_inbound] end
+  else . end
+| if cfg.warp.enabled == true then warp_routing else . end

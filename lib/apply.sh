@@ -40,7 +40,9 @@ kokoro_apply() {
         kokoro_die "validation failed"
     fi
 
-    kokoro_firewall_apply
-    kokoro_reload
+    kokoro_firewall_apply || kokoro_die "firewall apply failed"
+    kokoro_reload || kokoro_die "service reload failed"
+    source "$KOKORO_ROOT/lib/argo.sh"
+    kokoro_argo_sync || kokoro_die "$(kokoro_cf_text argo_service)"
     kokoro_log "apply complete"
 }

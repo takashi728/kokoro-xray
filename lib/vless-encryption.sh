@@ -24,6 +24,7 @@ kokoro_vless_encryption_disable() {
     kokoro_need_root
     kokoro_ensure_state
     kokoro_vless_encryption_require_edge
+    [[ $(kokoro_cfg '.argo.enabled // false') != true ]] || kokoro_die "$(kokoro_cf_text argo_invalid)"
     kokoro_cfg_set '.inbound.vless_encryption.enabled' 'false'
     kokoro_apply
     kokoro_warn "VLESS Encryption disabled; refresh client links"

@@ -47,6 +47,38 @@
     "socks_port": 9050
   },
   "routing": {},
+  "warp": {
+    "enabled": false,
+    "account_type": "free",
+    "endpoint": "162.159.198.2",
+    "port": 443,
+    "transport": "h3",
+    "sni": "consumer-masque.cloudflareclient.com",
+    "public_key": "",
+    "pinned_peer_cert_sha256": "",
+    "addresses": [],
+    "mtu": 1280,
+    "finalmask": {
+      "enabled": false,
+      "h2_fragment_lengths": "10-20",
+      "h2_fragment_delays": "10-20",
+      "h3_noise_enabled": false
+    },
+    "route_mode": "selective",
+    "route_presets": ["ai", "streaming", "google"],
+    "custom_domains": [],
+    "ipv4_via_warp": false
+  },
+  "argo": {
+    "enabled": false,
+    "mode": "named",
+    "hostname": "",
+    "protocol": "quic",
+    "local_port": 18080,
+    "xhttp_path": "",
+    "xhttp_mode": "auto",
+    "preferred_ip": ""
+  },
   "firewall": {
     "enabled": true,
     "ssh_port": 0,

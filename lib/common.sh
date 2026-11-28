@@ -10,8 +10,8 @@ export PATH
 readonly GREEN='\033[32m'
 readonly YELLOW='\033[33m'
 readonly RED='\033[31m'
-readonly CYAN='\033[36m'
-readonly BOLD='\033[1m'
+# shellcheck disable=SC2034 # Used by scripts sourcing this library.
+readonly CYAN='\033[36m' BOLD='\033[1m'
 readonly NC='\033[0m'
 
 readonly KOKORO_HOME="${HOME}/.kokoro-xray"
@@ -192,7 +192,19 @@ kokoro_install_systemd_unit() { # name content
 }
 
 kokoro_ensure_state() {
-    install -d -m 700 "${KOKORO_HOME}"
+    local state_lock_fd result
+    install -d -m 700 "${KOKORO_HOME}" || return 1
+    if [[ ! /proc/self/fd/9 -ef "$KOKORO_HOME/cloudflare.lock" ]]; then
+        exec {state_lock_fd}>"$KOKORO_HOME/cloudflare.lock" || return 1
+        flock -x "$state_lock_fd" || { exec {state_lock_fd}>&-; return 1; }
+    fi
+    kokoro_initialize_state
+    result=$?
+    if [[ -v state_lock_fd ]]; then exec {state_lock_fd}>&-; fi
+    return "$result"
+}
+
+kokoro_initialize_state() {
     install -d -m 700 "${KOKORO_LAST_GOOD}"
     if [[ -f "${KOKORO_CONFIG}" ]] && { [[ ! -s "${KOKORO_CONFIG}" ]] || ! jq -e type "${KOKORO_CONFIG}" >/dev/null 2>&1; }; then
         mv "${KOKORO_CONFIG}" "${KOKORO_CONFIG}.broken.$(date +%s)"

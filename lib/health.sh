@@ -54,6 +54,13 @@ kokoro_health() {
     echo "mode:     $(kokoro_cfg '.inbound.mode')"
     echo "transport: $(kokoro_cfg '.inbound.transport // "xhttp"')"
     echo "xray:     $(systemctl is-active xray 2>/dev/null || echo unknown)"
+    echo "WARP MASQUE: $(kokoro_cfg '.warp.enabled // false') $(kokoro_cfg '.warp.transport // "h3"')"
+    if [[ $(kokoro_cfg '.argo.enabled // false') == true ]]; then
+        source "$KOKORO_ROOT/lib/argo.sh"
+        kokoro_argo_status
+    else
+        echo 'Argo Tunnel: false'
+    fi
 
     if [[ -f "${KOKORO_ROOT}/lib/network-tune.sh" ]]; then
         # shellcheck source=lib/network-tune.sh
