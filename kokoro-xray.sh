@@ -37,7 +37,6 @@ kokoro_dispatch() {
         exit)    bash "${KOKORO_ROOT}/roles/exit.sh" "$@" ;;
         link)    bash "${KOKORO_ROOT}/roles/client.sh" "$@" ;;
         firewall)
-            shift || true
             source "${KOKORO_ROOT}/lib/firewall.sh"
             kokoro_firewall_cli "$@"
             ;;
