@@ -27,25 +27,29 @@ kokoro_state_flatten() { # prefix json -> eval-safe VAR=val lines
 }
 
 kokoro_state_unset() {
-    local v
-    for v in "${!KOKORO_CFG_@}" "${!KOKORO_SEC_@}"; do
-        unset "$v" 2>/dev/null || true
-    done
+    unset -v _KOKORO_RAW_CFG_JSON _KOKORO_RAW_SEC_JSON "${!KOKORO_CFG_@}" "${!KOKORO_SEC_@}"
 }
 
 kokoro_state_refresh_cfg() {
-    KOKORO_CFG_JSON="$(cat "${KOKORO_CONFIG}")"
-    eval "$(kokoro_state_flatten KOKORO_CFG "${KOKORO_CFG_JSON}")"
+    local json assignments
+    json="$(cat -- "$KOKORO_CONFIG")" || return 1
+    assignments="$(kokoro_state_flatten KOKORO_CFG "$json")" || return 1
+    unset -v "${!KOKORO_CFG_@}"
+    _KOKORO_RAW_CFG_JSON="$json"
+    eval "$assignments"
 }
 
 kokoro_state_refresh_sec() {
-    KOKORO_SEC_JSON="$(cat "${KOKORO_SECRETS}")"
-    eval "$(kokoro_state_flatten KOKORO_SEC "${KOKORO_SEC_JSON}")"
+    local json assignments
+    json="$(cat -- "$KOKORO_SECRETS")" || return 1
+    assignments="$(kokoro_state_flatten KOKORO_SEC "$json")" || return 1
+    unset -v "${!KOKORO_SEC_@}"
+    _KOKORO_RAW_SEC_JSON="$json"
+    eval "$assignments"
 }
 
 kokoro_state_refresh() {
-    kokoro_state_unset
-    kokoro_state_refresh_cfg
+    kokoro_state_refresh_cfg || return 1
     kokoro_state_refresh_sec
 }
 
@@ -54,8 +58,8 @@ kokoro_cfg() {
     name="KOKORO_CFG_$(kokoro_state_var_suffix "$path")"
     if [[ -v "$name" ]]; then
         printf '%s' "${!name}"
-    elif [[ -v KOKORO_CFG_JSON ]]; then
-        jq -r "$path" <<<"${KOKORO_CFG_JSON}"
+    elif [[ -v _KOKORO_RAW_CFG_JSON ]]; then
+        jq -r "$path" <<<"${_KOKORO_RAW_CFG_JSON}"
     else
         jq -r "$path" "${KOKORO_CONFIG}"
     fi
@@ -66,8 +70,8 @@ kokoro_sec() {
     name="KOKORO_SEC_$(kokoro_state_var_suffix "$path")"
     if [[ -v "$name" ]]; then
         printf '%s' "${!name}"
-    elif [[ -v KOKORO_SEC_JSON ]]; then
-        jq -r "$path" <<<"${KOKORO_SEC_JSON}"
+    elif [[ -v _KOKORO_RAW_SEC_JSON ]]; then
+        jq -r "$path" <<<"${_KOKORO_RAW_SEC_JSON}"
     else
         jq -r "$path" "${KOKORO_SECRETS}"
     fi

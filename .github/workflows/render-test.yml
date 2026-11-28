@@ -51,6 +51,7 @@ jobs:
       - name: Run audit remediation tests
         run: |
           bash tests/security.sh
+          bash tests/shell-hardening.sh
           bash tests/installer.sh
       - name: Install pinned Xray
         run: |

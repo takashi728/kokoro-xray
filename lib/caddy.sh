@@ -258,7 +258,7 @@ kokoro_caddy_download() { # version staged-binary
 }
 
 kokoro_caddy_install() (
-    local dest caddy_version staged
+    local dest caddy_version staged cleanup
     kokoro_need_root
     kokoro_validate_service_paths
     dest="$(kokoro_cfg '.paths.caddy_bin')"
@@ -271,11 +271,11 @@ kokoro_caddy_install() (
     fi
 
     staged="$(mktemp "${dest}.new.XXXXXX")" || return 1
-    trap 'rm -f -- "$staged"' EXIT
+    printf -v cleanup 'rm -f -- %q' "$staged"
+    trap "$cleanup" EXIT
     if kokoro_small_vps; then
         kokoro_log "downloading prebuilt Caddy ${caddy_version}"
         if ! kokoro_caddy_download "$caddy_version" "$staged"; then
-            rm -f -- "$staged"
             kokoro_die "verified prebuilt Caddy unavailable; install a matching binary from a trusted source and retry"
         fi
     else
@@ -283,10 +283,10 @@ kokoro_caddy_install() (
     fi
 
     if ! chmod 755 "$staged" || ! kokoro_caddy_installed_matches "$staged" "$caddy_version"; then
-        rm -f -- "$staged"
         kokoro_die "staged Caddy version or required modules did not match"
     fi
     mv -T -- "$staged" "$dest" || return 1
+    trap - EXIT
     kokoro_log "caddy ${caddy_version} installed to ${dest}"
     kokoro_caddy_install_service
 )
